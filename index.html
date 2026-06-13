@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Cup 2026 — AI Dashboard</title>
+  <meta name="description" content="Live scores, standings, AI news summaries and match analysis for FIFA World Cup 2026.">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────── -->
+<nav>
+  <a class="nav-logo" href="#">
+    <span class="trophy">🏆</span>
+    World Cup 2026
+  </a>
+
+  <ul class="nav-links">
+    <li><a href="#" data-section="scores"    onclick="showSection('scores');    return false;" class="active">Scores</a></li>
+    <li><a href="#" data-section="standings" onclick="showSection('standings'); return false;">Standings</a></li>
+    <li><a href="#" data-section="schedule"  onclick="showSection('schedule');  return false;">Schedule</a></li>
+    <li><a href="#" data-section="news"      onclick="showSection('news');      return false;">News</a></li>
+    <li><a href="#" data-section="ai"        onclick="showSection('ai');        return false;">✦ AI</a></li>
+  </ul>
+
+  <div class="nav-right">
+    <span class="live-badge">
+      <span class="live-dot"></span>
+      <span id="live-count">LIVE</span>
+    </span>
+    <button class="btn-config" onclick="openConfig()">⚙ Config</button>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────── -->
+<header class="hero">
+  <div class="hero-eyebrow">🌎 USA · Canada · Mexico · June–July 2026</div>
+  <h1>FIFA World Cup 2026</h1>
+  <p class="hero-sub">Live scores, real-time standings, and AI-powered match analysis — all in one dashboard.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="val" id="stat-live">—</div>
+      <div class="lbl">Live Now</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val" id="stat-today">—</div>
+      <div class="lbl">Today's Matches</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val">48</div>
+      <div class="lbl">Teams</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val">104</div>
+      <div class="lbl">Total Matches</div>
+    </div>
+    <div class="hero-stat">
+      <div class="val">16</div>
+      <div class="lbl">Host Cities</div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main ───────────────────────────────────────────────────────── -->
+<main class="container">
+
+  <!-- SCORES -->
+  <section id="section-scores" class="main-section section">
+    <div class="section-header">
+      <h2 class="section-title"><span class="icon">⚽</span> Today's Matches</h2>
+      <button class="section-link" onclick="refresh()">↻ Refresh</button>
+    </div>
+    <div class="scores-grid" id="scores-container">
+      <!-- skeleton -->
+      <div class="card match-card">
+        <div class="skeleton skeleton-line short" style="margin-bottom:1rem"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+      </div>
+      <div class="card match-card">
+        <div class="skeleton skeleton-line short" style="margin-bottom:1rem"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+      </div>
+      <div class="card match-card">
+        <div class="skeleton skeleton-line short" style="margin-bottom:1rem"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STANDINGS -->
+  <section id="section-standings" class="main-section section" style="display:none">
+    <div class="section-header">
+      <h2 class="section-title"><span class="icon">📊</span> Group Standings</h2>
+      <span style="font-size:0.75rem;color:var(--text-dim)">
+        <span style="color:var(--green)">■</span> Advance &nbsp;
+        <span style="color:var(--gold)">■</span> Playoff
+      </span>
+    </div>
+    <div class="groups-grid" id="standings-container">
+      <div class="card group-card">
+        <div class="skeleton skeleton-line short" style="margin-bottom:1rem"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line wide"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCHEDULE -->
+  <section id="section-schedule" class="main-section section" style="display:none">
+    <div class="section-header">
+      <h2 class="section-title"><span class="icon">📅</span> Upcoming Fixtures</h2>
+      <span style="font-size:0.75rem;color:var(--text-dim)">Next 7 days</span>
+    </div>
+    <div id="schedule-container">
+      <div class="bracket-placeholder">
+        <span style="font-size:2rem">📅</span>
+        <span>Loading schedule…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEWS -->
+  <section id="section-news" class="main-section section" style="display:none">
+    <div class="section-header">
+      <h2 class="section-title"><span class="icon">📰</span> Latest News</h2>
+      <button class="section-link" onclick="renderNews()">↻ Refresh</button>
+    </div>
+    <div class="news-grid" id="news-container">
+      <div class="card news-card">
+        <div class="skeleton skeleton-line short"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+        <div class="skeleton skeleton-line wide"></div>
+      </div>
+      <div class="card news-card">
+        <div class="skeleton skeleton-line short"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+        <div class="skeleton skeleton-line wide"></div>
+      </div>
+      <div class="card news-card">
+        <div class="skeleton skeleton-line short"></div>
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line med"></div>
+        <div class="skeleton skeleton-line wide"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI SECTION -->
+  <section id="section-ai" class="main-section section" style="display:none">
+    <div class="section-header">
+      <h2 class="section-title"><span class="icon">✦</span> AI Analysis</h2>
+      <span class="ai-badge">Powered by Claude</span>
+    </div>
+
+    <!-- Daily Digest -->
+    <div class="card commentary-panel" style="margin-bottom:1.25rem">
+      <div class="commentary-header">
+        <div class="commentary-title">📋 Daily Tournament Digest</div>
+        <button class="btn-generate" id="btn-digest" onclick="generateDigest()">✦ Daily Digest</button>
+      </div>
+      <div class="commentary-body" id="digest-body">
+        Generate a rich AI-written digest of today's World Cup action — click the button above.
+      </div>
+    </div>
+
+    <!-- Match Analysis -->
+    <div class="card commentary-panel">
+      <div class="commentary-header">
+        <div class="commentary-title">
+          🎯 Match Analysis
+          <span id="commentary-match" style="font-size:0.82rem;font-weight:400;color:var(--text-dim);margin-left:0.5rem">— select a match from Scores tab</span>
+        </div>
+        <button class="btn-generate" id="btn-analysis" onclick="generateAnalysis()">✦ Generate Analysis</button>
+      </div>
+      <div class="commentary-body" id="commentary-body">
+        Click on any match card in the Scores tab, then press "Generate Analysis" for an AI tactical breakdown.
+      </div>
+    </div>
+
+    <!-- Feature hints when no key -->
+    <div id="ai-no-key-hint" style="margin-top:1.25rem;padding:1rem 1.25rem;border:1px dashed rgba(240,192,64,0.3);border-radius:var(--radius);font-size:0.83rem;color:var(--text-dim)">
+      ⚙ <strong style="color:var(--text)">No API key set.</strong> Click <strong style="color:var(--gold)">⚙ Config</strong> in the navigation to add your Claude API key and unlock all AI features: match analysis, news summaries, and daily digests.
+      <br><br>
+      Get a free API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener" style="color:var(--gold)">console.anthropic.com</a>.
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────────────────── -->
+<footer>
+  <p>World Cup 2026 Dashboard · Data via ESPN · AI via <span>Claude</span> · Built with ♥</p>
+</footer>
+
+<!-- ── Config Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <h2>⚙ Configuration</h2>
+    <p>Add your Claude API key to enable AI match analysis, news summaries, and daily digests. The key is stored only in your browser's localStorage — it is never sent anywhere except directly to Anthropic's API.</p>
+
+    <div class="form-group">
+      <label class="form-label" for="config-key">CLAUDE API KEY</label>
+      <input class="form-input" id="config-key" type="password" placeholder="sk-ant-api03-…" autocomplete="off">
+      <div class="form-hint">
+        Get a key at <a href="https://console.anthropic.com/keys" target="_blank" rel="noopener">console.anthropic.com/keys</a>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeConfig()">Cancel</button>
+      <button class="btn-primary" onclick="saveConfig()">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Mobile bottom nav ──────────────────────────────────────────── -->
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <div class="bottom-nav-inner">
+    <button class="bottom-nav-btn active" id="bnav-scores"    onclick="showSection('scores');    updateBottomNav('scores')"   >
+      <span class="bnav-icon">⚽</span>Scores
+    </button>
+    <button class="bottom-nav-btn"        id="bnav-standings" onclick="showSection('standings'); updateBottomNav('standings')">
+      <span class="bnav-icon">📊</span>Tables
+    </button>
+    <button class="bottom-nav-btn"        id="bnav-schedule"  onclick="showSection('schedule');  updateBottomNav('schedule')" >
+      <span class="bnav-icon">📅</span>Schedule
+    </button>
+    <button class="bottom-nav-btn"        id="bnav-news"      onclick="showSection('news');      updateBottomNav('news')"     >
+      <span class="bnav-icon">📰</span>News
+    </button>
+    <button class="bottom-nav-btn"        id="bnav-ai"        onclick="showSection('ai');        updateBottomNav('ai')"       >
+      <span class="bnav-icon">✦</span>AI
+    </button>
+  </div>
+</nav>
+
+<!-- ── Toast container ────────────────────────────────────────────── -->
+<div class="toast-container"></div>
+
+<!-- ── Scripts ────────────────────────────────────────────────────── -->
+<script type="module" src="js/app.js"></script>
+
+<script>
+  // Hide AI no-key hint if key present
+  window.addEventListener('load', () => {
+    const hint = document.getElementById('ai-no-key-hint');
+    if (hint && localStorage.getItem('claude_api_key')) {
+      hint.style.display = 'none';
+    }
+  });
+</script>
+
+</body>
+</html>
