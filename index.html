@@ -4,18 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>World Cup 2026 — AI Dashboard</title>
-  <meta name="description" content="Live scores, standings, AI news summaries and match analysis for FIFA World Cup 2026.">
+  <meta name="description" content="Live scores, standings, AI news summaries and match analysis for FIFA World Cup 2026. Host cities, schedule, tournament bracket.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <!-- ── Navigation ─────────────────────────────────────────────────── -->
 <nav>
-  <a class="nav-logo" href="#" onclick="showSection('scores'); updateBottomNav('scores'); return false;">
+  <a class="nav-logo" href="#" onclick="showSection('scores'); return false;">
     <span class="trophy">🏆</span>World Cup 2026
   </a>
   <ul class="nav-links">
@@ -24,6 +25,7 @@
     <li><a href="#" data-section="schedule"  onclick="showSection('schedule');  return false;">Schedule</a></li>
     <li><a href="#" data-section="teams"     onclick="showSection('teams');     return false;">Teams</a></li>
     <li><a href="#" data-section="cities"    onclick="showSection('cities');    return false;">Cities</a></li>
+    <li><a href="#" data-section="map"       onclick="showSection('map');       return false;">Map</a></li>
     <li><a href="#" data-section="news"      onclick="showSection('news');      return false;">News</a></li>
     <li><a href="#" data-section="ai"        onclick="showSection('ai');        return false;">✦ AI</a></li>
   </ul>
@@ -39,23 +41,23 @@
   <h1>FIFA World Cup 2026</h1>
   <p class="hero-sub">Live scores, real-time standings, and AI-powered match analysis — all in one dashboard.</p>
   <div class="hero-stats">
-    <button class="hero-stat" onclick="showSection('scores'); updateBottomNav('scores');" title="View live matches">
+    <button class="hero-stat" onclick="showSection('scores');" title="View live matches">
       <div class="val" id="stat-live">—</div>
       <div class="lbl">Live Now</div>
     </button>
-    <button class="hero-stat" onclick="showSection('scores'); updateBottomNav('scores');" title="View today's matches">
+    <button class="hero-stat" onclick="showSection('scores');" title="View today's matches">
       <div class="val" id="stat-today">—</div>
       <div class="lbl">Today's Matches</div>
     </button>
-    <button class="hero-stat" onclick="showSection('teams'); updateBottomNav('teams');" title="View all teams">
+    <button class="hero-stat" onclick="showSection('teams');" title="View all teams">
       <div class="val" id="stat-teams">48</div>
       <div class="lbl">Teams</div>
     </button>
-    <button class="hero-stat" onclick="showSection('schedule'); updateBottomNav('schedule');" title="View full schedule">
+    <button class="hero-stat" onclick="showSection('schedule');" title="View full schedule">
       <div class="val">104</div>
       <div class="lbl">Total Matches</div>
     </button>
-    <button class="hero-stat" onclick="showSection('cities'); updateBottomNav('cities');" title="View host cities">
+    <button class="hero-stat" onclick="showSection('cities');" title="View host cities">
       <div class="val">16</div>
       <div class="lbl">Host Cities</div>
     </button>
@@ -87,9 +89,10 @@
         <span style="color:var(--green)">■</span> Advance &nbsp;<span style="color:var(--gold)">■</span> Playoff
       </span>
     </div>
-    <div class="groups-grid" id="standings-container">
-      <div class="card group-card"><div class="skeleton skeleton-line short" style="margin-bottom:1rem"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line wide"></div></div>
+    <div id="standings-container">
+      <div class="card group-card"><div class="skeleton skeleton-line short" style="margin-bottom:1rem"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line wide"></div></div>
     </div>
+    <div id="goals-viz" style="margin-top:1.5rem"></div>
   </section>
 
   <!-- SCHEDULE -->
@@ -120,9 +123,20 @@
       <h2 class="section-title"><span class="icon">🏟</span> Host Cities &amp; Stadiums</h2>
       <span style="font-size:0.75rem;color:var(--text-dim)">3 Countries · 16 Venues</span>
     </div>
-    <div id="cities-container">
-      <div class="bracket-placeholder"><span style="font-size:2rem">🏟</span><span>Loading cities…</span></div>
+    <div id="cities-container"></div>
+  </section>
+
+  <!-- MAP -->
+  <section id="section-map" class="main-section section" style="display:none">
+    <div class="section-header">
+      <h2 class="section-title"><span class="icon">🗺</span> Stadium Map</h2>
+      <span style="font-size:0.75rem;color:var(--text-dim)">Click any marker for venue details</span>
     </div>
+    <div id="stadium-map"></div>
+    <div class="bracket-round" style="margin-top:1.5rem">
+      <div class="bracket-round-name" style="margin-bottom:0.75rem">Tournament Format — 2026 Progression</div>
+    </div>
+    <div id="bracket-container"></div>
   </section>
 
   <!-- NEWS -->
@@ -132,8 +146,8 @@
       <button class="section-link" onclick="refreshNews()">↻ Refresh</button>
     </div>
     <div class="news-grid" id="news-container">
-      <div class="card news-card"><div class="skeleton skeleton-line short"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line med"></div><div class="skeleton skeleton-line wide"></div></div>
-      <div class="card news-card"><div class="skeleton skeleton-line short"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line med"></div><div class="skeleton skeleton-line wide"></div></div>
+      <div class="card news-card"><div class="skeleton skeleton-line short"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line med"></div></div>
+      <div class="card news-card"><div class="skeleton skeleton-line short"></div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line med"></div></div>
     </div>
   </section>
 
@@ -179,15 +193,28 @@
 <!-- ── Mobile bottom nav ──────────────────────────────────────────── -->
 <nav class="bottom-nav" aria-label="Mobile navigation">
   <div class="bottom-nav-inner">
-    <button class="bottom-nav-btn active" id="bnav-scores"    onclick="showSection('scores');    updateBottomNav('scores')"><span class="bnav-icon">⚽</span>Scores</button>
-    <button class="bottom-nav-btn"        id="bnav-standings" onclick="showSection('standings'); updateBottomNav('standings')"><span class="bnav-icon">📊</span>Tables</button>
-    <button class="bottom-nav-btn"        id="bnav-schedule"  onclick="showSection('schedule');  updateBottomNav('schedule')"><span class="bnav-icon">📅</span>Schedule</button>
-    <button class="bottom-nav-btn"        id="bnav-teams"     onclick="showSection('teams');     updateBottomNav('teams')"><span class="bnav-icon">🌍</span>Teams</button>
-    <button class="bottom-nav-btn"        id="bnav-cities"    onclick="showSection('cities');    updateBottomNav('cities')"><span class="bnav-icon">🏟</span>Cities</button>
-    <button class="bottom-nav-btn"        id="bnav-news"      onclick="showSection('news');      updateBottomNav('news')"><span class="bnav-icon">📰</span>News</button>
-    <button class="bottom-nav-btn"        id="bnav-ai"        onclick="showSection('ai');        updateBottomNav('ai')"><span class="bnav-icon">✦</span>AI</button>
+    <button class="bottom-nav-btn active" id="bnav-scores"    onclick="showSection('scores');"><span class="bnav-icon">⚽</span>Scores</button>
+    <button class="bottom-nav-btn"        id="bnav-standings" onclick="showSection('standings');"><span class="bnav-icon">📊</span>Tables</button>
+    <button class="bottom-nav-btn"        id="bnav-schedule"  onclick="showSection('schedule');"><span class="bnav-icon">📅</span>Schedule</button>
+    <button class="bottom-nav-btn"        id="bnav-map"       onclick="showSection('map');"><span class="bnav-icon">🗺</span>Map</button>
+    <button class="bottom-nav-btn"        id="bnav-cities"    onclick="showSection('cities');"><span class="bnav-icon">🏟</span>Cities</button>
+    <button class="bottom-nav-btn"        id="bnav-news"      onclick="showSection('news');"><span class="bnav-icon">📰</span>News</button>
+    <button class="bottom-nav-btn"        id="bnav-ai"        onclick="showSection('ai');"><span class="bnav-icon">✦</span>AI</button>
   </div>
 </nav>
+
+<!-- ── Detail Modal (Cities + Teams) ──────────────────────────────── -->
+<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this)closeDetailModal()">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="detail-modal-title"></h2>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-scroll">
+      <div id="detail-modal-body"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ── Config Modal ───────────────────────────────────────────────── -->
 <div class="modal-overlay" id="config-modal">
@@ -207,6 +234,7 @@
 </div>
 
 <div class="toast-container"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

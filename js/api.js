@@ -100,34 +100,41 @@ export async function fetchScoreboard() {
   }
 }
 
-// ── Standings ─────────────────────────────────────────────────────────────
+// ── Standings (correct v2 endpoint) ──────────────────────────────────────
 export async function fetchStandings() {
   try {
-    const d = await fetchJSON(`${ESPN_BASE}/${WC_SLUG}/standings`);
+    const d = await fetchJSON('https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings');
     const groups = [];
     for (const child of (d.children || [])) {
       const groupName = child.name || child.abbreviation || '';
       const entries = (child.standings?.entries || []).map((e, idx) => {
         const team = e.team || {};
         const stats = {};
-        for (const s of (e.stats || [])) stats[s.abbreviation || s.name] = s.value;
+        for (const s of (e.stats || [])) stats[s.name] = s.value;
         return {
-          pos: idx + 1,
+          pos:  (stats['rank'] ?? idx + 1),
           abbr: team.abbreviation || '',
           name: team.shortDisplayName || team.displayName || '',
           flag: teamFlag(team.abbreviation, team.displayName),
-          gp:  stats['GP']  ?? stats['gp']  ?? 0,
-          w:   stats['W']   ?? stats['w']   ?? 0,
-          d:   stats['D']   ?? stats['d']   ?? 0,
-          l:   stats['L']   ?? stats['l']   ?? 0,
-          gf:  stats['GF']  ?? stats['gf']  ?? 0,
-          ga:  stats['GA']  ?? stats['ga']  ?? 0,
-          gd:  stats['GD']  ?? stats['gd']  ?? 0,
-          pts: stats['PTS'] ?? stats['pts'] ?? 0,
+          logo: team.logos?.[0]?.href || '',
+          gp:   stats['gamesPlayed']      ?? 0,
+          w:    stats['wins']             ?? 0,
+          d:    stats['ties']             ?? 0,
+          l:    stats['losses']           ?? 0,
+          gf:   stats['pointsFor']        ?? 0,
+          ga:   stats['pointsAgainst']    ?? 0,
+          gd:   stats['pointDifferential'] ?? 0,
+          pts:  stats['points']           ?? 0,
+          advanced: stats['advanced']     ?? 0,
         };
       });
+      // Sort by points desc, then GD desc
+      entries.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      entries.forEach((e, i) => e.pos = i + 1);
       if (entries.length) groups.push({ name: groupName, entries });
     }
+    // Sort groups alphabetically
+    groups.sort((a, b) => a.name.localeCompare(b.name));
     return groups;
   } catch (e) {
     console.warn('Standings fetch failed:', e);
