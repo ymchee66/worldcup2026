@@ -105,7 +105,6 @@ function renderScores() {
             <span class="score-sep"> – </span>
             <span>${m.home.score}</span>
           </div>
-          ${m.period ? `<div class="score-period">Half ${m.period}</div>` : ''}
         </div>
         <div class="team">
           <span class="team-flag">${m.home.flag}</span>
