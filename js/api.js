@@ -2,6 +2,27 @@
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
 const WC_SLUG   = 'fifa.world';
 
+// Slugs → human-readable round labels
+const ROUND_LABELS = {
+  'group-stage':         'Group Stage',
+  'round-of-32':         'Round of 32',
+  'round-of-16':         'Round of 16',
+  'quarterfinal':        'Quarterfinal',
+  'quarterfinals':       'Quarterfinal',
+  'semifinal':           'Semifinal',
+  'semifinals':          'Semifinal',
+  'third-place-playoff': '3rd Place',
+  'final':               'Final',
+  'friendly':            'Friendly',
+  'qualifying':          'Qualifying',
+  'qualification':       'Qualifying',
+};
+
+function roundLabel(slug) {
+  if (!slug) return '';
+  return ROUND_LABELS[slug.toLowerCase()] || slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // Country → flag emoji lookup (ISO 3166-1 alpha-2)
 const FLAG = (code) => {
   if (!code) return '🏳';
@@ -69,6 +90,8 @@ export async function fetchScoreboard() {
         },
         venue: comp.venue?.fullName || '',
         broadcast: comp.broadcasts?.[0]?.names?.[0] || '',
+        round: roundLabel(ev.season?.slug),
+        group: comp.notes?.[0]?.headline || '',   // e.g. "Group A"
       };
     });
   } catch (e) {
@@ -131,39 +154,59 @@ export async function fetchNews(limit = 12) {
   }
 }
 
-// ── Schedule (upcoming) ───────────────────────────────────────────────────
-export async function fetchSchedule(daysAhead = 7) {
-  const results = [];
-  const today = new Date();
-  for (let i = 1; i <= daysAhead; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const yyyymmdd = d.toISOString().slice(0,10).replace(/-/g,'');
-    try {
-      const data = await fetchJSON(`${ESPN_BASE}/${WC_SLUG}/scoreboard?dates=${yyyymmdd}`);
-      for (const ev of (data.events || [])) {
-        const comp = ev.competitions?.[0] || {};
-        const competitors = comp.competitors || [];
-        const home = competitors.find(c => c.homeAway === 'home') || competitors[0] || {};
-        const away = competitors.find(c => c.homeAway === 'away') || competitors[1] || {};
-        results.push({
-          id: ev.id,
-          date: ev.date,
-          home: {
-            abbr: home.team?.abbreviation || '',
-            name: home.team?.shortDisplayName || '',
-            flag: teamFlag(home.team?.abbreviation, home.team?.displayName),
-          },
-          away: {
-            abbr: away.team?.abbreviation || '',
-            name: away.team?.shortDisplayName || '',
-            flag: teamFlag(away.team?.abbreviation, away.team?.displayName),
-          },
-          venue: comp.venue?.fullName || '',
-          round: ev.season?.slug || '',
-        });
-      }
-    } catch {}
+// ── Schedule (full tournament, parallel fetch) ────────────────────────────
+// World Cup 2026: Jun 11 – Jul 19. We fetch every date in the window in
+// parallel so the tab loads in one round-trip instead of 39 sequential ones.
+export async function fetchSchedule() {
+  const start = new Date('2026-06-11');
+  const end   = new Date('2026-07-19');
+
+  // Build list of yyyymmdd strings for the full tournament window
+  const dates = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    dates.push(d.toISOString().slice(0, 10).replace(/-/g, ''));
   }
+
+  const responses = await Promise.allSettled(
+    dates.map(yyyymmdd =>
+      fetchJSON(`${ESPN_BASE}/${WC_SLUG}/scoreboard?dates=${yyyymmdd}`)
+    )
+  );
+
+  const results = [];
+  for (const r of responses) {
+    if (r.status !== 'fulfilled') continue;
+    for (const ev of (r.value.events || [])) {
+      const comp = ev.competitions?.[0] || {};
+      const competitors = comp.competitors || [];
+      const home = competitors.find(c => c.homeAway === 'home') || competitors[0] || {};
+      const away = competitors.find(c => c.homeAway === 'away') || competitors[1] || {};
+      const status = comp.status?.type || {};
+      results.push({
+        id:     ev.id,
+        date:   ev.date,
+        status: status.state,
+        statusText: status.shortDetail || '',
+        home: {
+          abbr:  home.team?.abbreviation || '',
+          name:  home.team?.shortDisplayName || '',
+          flag:  teamFlag(home.team?.abbreviation, home.team?.displayName),
+          score: home.score ?? null,
+        },
+        away: {
+          abbr:  away.team?.abbreviation || '',
+          name:  away.team?.shortDisplayName || '',
+          flag:  teamFlag(away.team?.abbreviation, away.team?.displayName),
+          score: away.score ?? null,
+        },
+        venue: comp.venue?.fullName || '',
+        round: roundLabel(ev.season?.slug),
+        group: comp.notes?.[0]?.headline || '',
+      });
+    }
+  }
+
+  // Sort chronologically (responses arrive out of order from Promise.allSettled)
+  results.sort((a, b) => new Date(a.date) - new Date(b.date));
   return results;
 }

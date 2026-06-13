@@ -70,7 +70,6 @@ nav {
 .nav-logo .trophy { font-size: 1.4rem; }
 
 .nav-links {
-  display: flex;
   gap: 0.25rem;
   list-style: none;
 }
@@ -328,6 +327,16 @@ nav {
   text-align: center;
 }
 
+.match-round {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.75;
+  margin-bottom: 0.6rem;
+}
+
 .match-venue {
   margin-top: 0.85rem;
   padding-top: 0.75rem;
@@ -337,6 +346,25 @@ nav {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.schedule-day-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+  padding-left: 0.25rem;
+}
+
+.schedule-day-header.today {
+  color: var(--gold);
+  font-size: 0.85rem;
+}
+
+.schedule-day-header.past {
+  opacity: 0.5;
 }
 
 /* ── Groups / Standings ── */
@@ -740,8 +768,9 @@ footer span { color: var(--gold); }
 
 /* ── Mobile bottom nav ── */
 .bottom-nav {
-  display: none;
+  display: block;
   position: fixed;
+  top: auto;
   bottom: 0;
   left: 0;
   right: 0;
@@ -787,10 +816,15 @@ footer span { color: var(--gold); }
   filter: drop-shadow(0 0 6px rgba(240,192,64,0.6));
 }
 
-/* ── Responsive: Tablet ── */
+/* ── Desktop: hide bottom nav, show top nav links ── */
+@media (min-width: 901px) {
+  .bottom-nav { display: none; }
+  .nav-links   { display: flex; }
+}
+
+/* ── Responsive: Tablet & Mobile ── */
 @media (max-width: 900px) {
   .nav-links { display: none; }
-  .bottom-nav { display: block; }
   main.container { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
   footer { padding-bottom: calc(1.5rem + 80px + env(safe-area-inset-bottom)); }
 }
@@ -820,17 +854,16 @@ footer span { color: var(--gold); }
   .hero h1 { font-size: 2.4rem; }
   .hero-sub { font-size: 0.9rem; }
 
-  /* 3-column stats grid, consistent */
+  /* all 5 stats in one even row */
   .hero-stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem 0.5rem;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
     width: 100%;
-    max-width: 360px;
   }
 
-  .hero-stat .val { font-size: 1.5rem; }
-  .hero-stat .lbl { font-size: 0.65rem; }
+  .hero-stat .val { font-size: 1.3rem; }
+  .hero-stat .lbl { font-size: 0.58rem; letter-spacing: 0.04em; }
 
   .container { padding: 0 0.85rem; }
 

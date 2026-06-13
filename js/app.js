@@ -62,12 +62,14 @@ function renderScores() {
       ? (m.clock ? `${m.clock}'` : 'LIVE')
       : m.status === 'post' ? 'FT'
       : matchLocalTime(m.date);
+    const roundLabel = [m.round, m.group].filter(Boolean).join(' · ');
 
     return `<div class="card match-card" data-id="${m.id}" onclick="selectMatch('${m.id}')">
       <div class="match-status">
         <span class="status-badge ${statusCls}">${statusLbl}</span>
         <span class="match-time">${matchLocalDate(m.date)}</span>
       </div>
+      ${roundLabel ? `<div class="match-round">${roundLabel}</div>` : ''}
       <div class="match-teams">
         <div class="team">
           <span class="team-flag">${m.away.flag}</span>
@@ -110,7 +112,11 @@ function renderStandings() {
       <table class="standings-table">
         <thead><tr>
           <th style="width:50%">Team</th>
-          <th>GP</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th>
+          <th>GP</th>
+          <th class="col-hide-mobile">W</th>
+          <th class="col-hide-mobile">D</th>
+          <th class="col-hide-mobile">L</th>
+          <th>GD</th><th>Pts</th>
         </tr></thead>
         <tbody>
           ${g.entries.map((e, i) => `
@@ -121,9 +127,9 @@ function renderStandings() {
                 <span class="team-name-sm">${e.name}</span>
               </div></td>
               <td>${e.gp}</td>
-              <td>${e.w}</td>
-              <td>${e.d}</td>
-              <td>${e.l}</td>
+              <td class="col-hide-mobile">${e.w}</td>
+              <td class="col-hide-mobile">${e.d}</td>
+              <td class="col-hide-mobile">${e.l}</td>
               <td>${e.gd > 0 ? '+' : ''}${e.gd}</td>
               <td><strong>${e.pts}</strong></td>
             </tr>`).join('')}
@@ -167,9 +173,12 @@ function renderNews() {
 function renderSchedule() {
   const el = $('schedule-container');
   if (!state.schedule.length) {
-    el.innerHTML = `<div class="bracket-placeholder"><span>No upcoming fixtures found.</span></div>`;
+    el.innerHTML = `<div class="bracket-placeholder"><span style="font-size:2rem">📅</span><span>Loading full tournament schedule…</span></div>`;
     return;
   }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   // Group by date
   const byDate = {};
@@ -179,22 +188,41 @@ function renderSchedule() {
     byDate[d].push(m);
   }
 
-  el.innerHTML = Object.entries(byDate).map(([date, ms]) => `
-    <div style="margin-bottom:1.5rem">
-      <div style="font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.75rem">${date}</div>
+  el.innerHTML = Object.entries(byDate).map(([date, ms]) => {
+    const matchDate = new Date(ms[0].date);
+    matchDate.setHours(0, 0, 0, 0);
+    const isPast   = matchDate < today;
+    const isToday  = matchDate.getTime() === today.getTime();
+    const dayLabel = isToday ? '📍 Today' : date;
+
+    return `
+    <div style="margin-bottom:1.75rem">
+      <div class="schedule-day-header ${isToday ? 'today' : isPast ? 'past' : ''}">${dayLabel}</div>
       <div class="scores-grid">
-        ${ms.map(m => `
-          <div class="card match-card">
+        ${ms.map(m => {
+          const statusCls = m.status === 'in' ? 'status-live' : m.status === 'post' ? 'status-ft' : 'status-ns';
+          const statusLbl = m.status === 'in' ? 'LIVE'
+            : m.status === 'post' ? 'FT'
+            : matchLocalTime(m.date);
+          const roundLabel = [m.round, m.group].filter(Boolean).join(' · ');
+          const hasScore = m.home.score !== null && m.away.score !== null;
+
+          return `<div class="card match-card">
             <div class="match-status">
-              <span class="status-badge status-ns">${matchLocalTime(m.date)}</span>
+              <span class="status-badge ${statusCls}">${statusLbl}</span>
+              <span class="match-time">${matchLocalDate(m.date)}</span>
             </div>
+            ${roundLabel ? `<div class="match-round">${roundLabel}</div>` : ''}
             <div class="match-teams">
               <div class="team">
                 <span class="team-flag">${m.away.flag}</span>
                 <span class="team-name">${m.away.name}</span>
               </div>
               <div class="match-score">
-                <div class="score-main" style="font-size:1.2rem;color:var(--text-dim)">vs</div>
+                ${hasScore
+                  ? `<div class="score-main">${m.away.score} <span class="score-sep">–</span> ${m.home.score}</div>`
+                  : `<div class="score-main" style="font-size:1.1rem;color:var(--text-dim)">vs</div>`
+                }
               </div>
               <div class="team">
                 <span class="team-flag">${m.home.flag}</span>
@@ -202,9 +230,11 @@ function renderSchedule() {
               </div>
             </div>
             ${m.venue ? `<div class="match-venue">📍 ${m.venue}</div>` : ''}
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── Nav sections ──────────────────────────────────────────────────────────
@@ -216,9 +246,17 @@ function showSection(name) {
   document.querySelectorAll('.nav-links a').forEach(a => {
     a.classList.toggle('active', a.dataset.section === name);
   });
+  updateBottomNav(name);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 window.showSection = showSection;
+
+window.updateBottomNav = function(name) {
+  document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.id === `bnav-${name}`);
+  });
+};
 
 // ── Match detail / AI commentary ──────────────────────────────────────────
 window.selectMatch = function(id) {
@@ -324,7 +362,7 @@ async function refresh() {
 }
 
 async function loadSchedule() {
-  state.schedule = await fetchSchedule(7);
+  state.schedule = await fetchSchedule();
   renderSchedule();
 }
 
@@ -339,7 +377,7 @@ function updateHeroStats() {
 async function init() {
   showSection('scores');
   await refresh();
-  loadSchedule(); // non-blocking
+  loadSchedule();
 
   // refresh scores every 60s
   setInterval(async () => {
