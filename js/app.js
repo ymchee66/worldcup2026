@@ -379,7 +379,10 @@ function renderCities() {
       <div class="cities-grid">${cities.map(c => {
         const photo = CITY_PHOTOS[c.city] || STADIUM_PHOTOS[c.stadium] || '';
         return `<div class="card city-card" onclick="showCityDetail('${c.city}')" style="cursor:pointer">
-          ${photo ? `<div class="city-photo" style="background-image:url('${photo}')"><div class="city-photo-overlay"></div><div class="city-photo-flag">${c.flag}</div></div>` : `<div class="city-flag">${c.flag}</div>`}
+          <div class="city-photo-wrap">
+            ${photo ? `<img class="city-photo-img" src="${photo}" alt="${c.city}" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <div class="city-photo-flag">${c.flag}</div>
+          </div>
           <div class="city-info">
             <div class="city-name">${c.city}</div>
             <div class="city-stadium">${c.stadium}</div>
@@ -860,7 +863,7 @@ window.showCityDetail = function(cityName) {
   const cityPhoto    = CITY_PHOTOS[city.city] || '';
   $('detail-modal-title').textContent = `${city.flag} ${city.city}`;
   $('detail-modal-body').innerHTML = `
-    ${stadiumPhoto ? `<div class="modal-hero-photo" style="background-image:url('${stadiumPhoto}')"><div class="modal-hero-overlay"><div class="modal-hero-caption">${city.stadium}</div></div></div>` : ''}
+    ${stadiumPhoto ? `<div class="modal-hero-photo"><img src="${stadiumPhoto}" alt="${city.stadium}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.style.display='none'"><div class="modal-hero-overlay"><div class="modal-hero-caption">${city.stadium}</div></div></div>` : ''}
     <div class="detail-section">
       ${!stadiumPhoto ? `<div class="detail-hero-stat">${city.stadium}</div>` : ''}
       ${city.highlight ? `<div class="detail-badge">★ ${city.highlight}</div>` : ''}
@@ -1081,7 +1084,8 @@ function renderGallery() {
     <div class="scores-section-label" style="margin-bottom:1rem">🏟 World Cup 2026 Stadiums</div>
     <div class="gallery-grid">${GALLERY.map(g => `
       <div class="gallery-card" onclick="showSection('${g.section}')">
-        <div class="gallery-img" style="background-image:url('${g.img}')">
+        <div class="gallery-img">
+          <img src="${g.img}" alt="${g.title}" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'">
           <div class="gallery-overlay">
             <div class="gallery-title">${g.title}</div>
             <div class="gallery-sub">${g.sub}</div>
@@ -1093,7 +1097,8 @@ function renderGallery() {
     <div class="scores-section-label" style="margin:2rem 0 1rem">🌆 Host Cities</div>
     <div class="gallery-grid gallery-grid-cities">${CITY_GALLERY.map(g => `
       <div class="gallery-card" onclick="showCityDetail('${g.title}')">
-        <div class="gallery-img" style="background-image:url('${g.img}')">
+        <div class="gallery-img">
+          <img src="${g.img}" alt="${g.title}" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'">
           <div class="gallery-overlay">
             <div class="gallery-title">${g.title}</div>
             <div class="gallery-sub">${g.sub}</div>

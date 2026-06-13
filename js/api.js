@@ -30,21 +30,31 @@ const FLAG = (code) => {
 };
 
 // Map ESPN team abbreviation/name to ISO code best-effort
+// ESPN FIFA WC 2026 abbreviations → ISO 3166-1 alpha-2
 const TEAM_ISO = {
-  USA:'US', MEX:'MX', CAN:'CA', BRA:'BR', ARG:'AR', FRA:'FR', ENG:'GB-ENG',
-  ESP:'ES', GER:'DE', ITA:'IT', POR:'PT', NED:'NL', BEL:'BE', CRO:'HR',
-  MAR:'MA', SEN:'SN', GHA:'GH', NGA:'NG', CMR:'CM', EGY:'EG', TUN:'TN',
-  JPN:'JP', KOR:'KR', AUS:'AU', IRN:'IR', SAU:'SA', QAT:'QA', URU:'UY',
-  COL:'CO', CHI:'CL', PER:'PE', ECU:'EC', PAR:'PY', BOL:'BO', VEN:'VE',
+  // Americas
+  USA:'US', MEX:'MX', CAN:'CA', BRA:'BR', ARG:'AR', URU:'UY',
+  COL:'CO', ECU:'EC', PAR:'PY', BOL:'BO', VEN:'VE', PER:'PE', CHI:'CL',
   HON:'HN', CRC:'CR', PAN:'PA', JAM:'JM', TRI:'TT', SLV:'SV', GTM:'GT',
-  NZL:'NZ', FIJ:'FJ', ALG:'DZ', CIV:'CI', MLI:'ML', BFA:'BF', GAB:'GA',
-  SWI:'CH', AUT:'AT', SWE:'SE', NOR:'NO', DEN:'DK', POL:'PL', UKR:'UA',
-  SRB:'RS', SCO:'GB-SCO', WAL:'GB-WLS', IRL:'IE', SVK:'SK', HUN:'HU',
-  CZE:'CZ', GRE:'GR', TUR:'TR', ROU:'RO', ALB:'AL', SLO:'SI', GEO:'GE',
-  RSA:'ZA', ZIM:'ZW', ANG:'AO', MOZ:'MZ', TAN:'TZ', KEN:'KE', ETH:'ET',
-  IDN:'ID', THA:'TH', VIE:'VN', MYS:'MY', PHI:'PH', IND:'IN', PAK:'PK',
-  ISR:'IL', LBN:'LB', JOR:'JO', IRQ:'IQ', OMA:'OM', UAE:'AE', KWT:'KW',
-  UZB:'UZ', KAZ:'KZ', ARM:'AM', AZE:'AZ',
+  CUW:'CW', HAI:'HT',
+  // Europe
+  FRA:'FR', ENG:'GB-ENG', SCO:'GB-SCO', WAL:'GB-WLS',
+  ESP:'ES', GER:'DE', ITA:'IT', POR:'PT', NED:'NL', BEL:'BE', CRO:'HR',
+  SUI:'CH', AUT:'AT', SWE:'SE', NOR:'NO', DEN:'DK', POL:'PL', UKR:'UA',
+  SRB:'RS', IRL:'IE', SVK:'SK', HUN:'HU', CZE:'CZ', GRE:'GR', TUR:'TR',
+  ROU:'RO', ALB:'AL', SLO:'SI', GEO:'GE', AZE:'AZ', ARM:'AM', MKD:'MK',
+  BIH:'BA', KOS:'XK', ISL:'IS', FIN:'FI', LVA:'LV', LTU:'LT', EST:'EE',
+  // Africa
+  MAR:'MA', SEN:'SN', GHA:'GH', NGA:'NG', CMR:'CM', EGY:'EG', TUN:'TN',
+  ALG:'DZ', CIV:'CI', MLI:'ML', BFA:'BF', GAB:'GA', RSA:'ZA', CPV:'CV',
+  COD:'CD', MOZ:'MZ', TAN:'TZ', KEN:'KE', ETH:'ET', ZIM:'ZW', ANG:'AO',
+  // Asia / Middle East
+  JPN:'JP', KOR:'KR', AUS:'AU', IRN:'IR', KSA:'SA', QAT:'QA', IRQ:'IQ',
+  JOR:'JO', OMA:'OM', UAE:'AE', KWT:'KW', UZB:'UZ', KAZ:'KZ', IDN:'ID',
+  THA:'TH', VIE:'VN', MYS:'MY', PHI:'PH', IND:'IN', PAK:'PK', ISR:'IL',
+  NZL:'NZ', FIJ:'FJ',
+  // Alias spelt differently by some sources
+  SWI:'CH', SAU:'SA', HOL:'NL', DEN:'DK',
 };
 
 // Regional flags not coverable by 2-letter ISO code (tag-based emoji)
