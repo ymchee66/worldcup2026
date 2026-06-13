@@ -1108,7 +1108,7 @@ function renderGallery() {
 
   el.innerHTML = `
     <div class="scores-section-label" style="margin-bottom:1rem">⚽ World Cup 2026 — Match Photos</div>
-    <div class="gallery-grid">${MATCH_PHOTOS.map(g => galleryCard(g, `onclick="${g.click || 'showSection(\'scores\')'}"`)  .join('')}
+    <div class="gallery-grid">${MATCH_PHOTOS.map(g => galleryCard(g, 'onclick="showSection(\'scores\')"')).join('')}
     </div>
 
     <div class="scores-section-label" style="margin:2rem 0 1rem">🏟 Host Stadiums</div>
