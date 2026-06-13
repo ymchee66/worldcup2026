@@ -1,5 +1,5 @@
 import { fetchScoreboard, fetchStandings, fetchNews, fetchSchedule,
-         fetchMatchSummary, fetchTeamRoster, fetchAllTeams } from './api.js';
+         fetchMatchSummary, fetchTeamRoster } from './api.js';
 import { streamMatchAnalysis, streamDailyDigest, summariseArticle } from './ai.js';
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -86,6 +86,45 @@ const BROADCASTS_GUIDE = [
   { region:'🇦🇺 Australia',channels:['SBS (free!)'], free:'SBS free streaming', link:'https://www.sbs.com.au/sport/football' },
   { region:'🌍 Global',    channels:['FIFA+ (highlights — free)','Official FIFA YouTube channel'], free:'FIFA+ free highlights', link:'https://www.fifa.com/fifaplus/en' },
 ];
+
+// ── Stadium & city photo lookup (Wikimedia Commons) ───────────────────────
+const STADIUM_PHOTOS = {
+  'MetLife Stadium':      'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Metlife_stadium_%28Aerial_view%29.jpg/800px-Metlife_stadium_%28Aerial_view%29.jpg',
+  'SoFi Stadium':         'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/SoFi_Stadium_2023.jpg/800px-SoFi_Stadium_2023.jpg',
+  'AT&T Stadium':         'https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Arlington_June_2020_4_%28AT%26T_Stadium%29.jpg/800px-Arlington_June_2020_4_%28AT%26T_Stadium%29.jpg',
+  "Levi's Stadium":       'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Levi%27s_Stadium_in_February_2016_prior_to_Super_Bowl_50_%2824398261729%29.jpg/800px-Levi%27s_Stadium_in_February_2016_prior_to_Super_Bowl_50_%2824398261729%29.jpg',
+  'Hard Rock Stadium':    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Hard_Rock_Stadium_for_Super_Bowl_LIV_%2849606710103%29.jpg/800px-Hard_Rock_Stadium_for_Super_Bowl_LIV_%2849606710103%29.jpg',
+  'Mercedes-Benz Stadium':'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Mercedes_Benz_Stadium_time_lapse_capture_2017-08-13.jpg/800px-Mercedes_Benz_Stadium_time_lapse_capture_2017-08-13.jpg',
+  'Lumen Field':          'https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/2025_FIFA_Club_World_Cup_-_Seattle_Sounders_FC_vs._Atl%C3%A9tico_Madrid_-_05.jpg/800px-2025_FIFA_Club_World_Cup_-_Seattle_Sounders_FC_vs._Atl%C3%A9tico_Madrid_-_05.jpg',
+  'Gillette Stadium':     'https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Gillette_Stadium_%28Top_View%29.jpg/800px-Gillette_Stadium_%28Top_View%29.jpg',
+  'NRG Stadium':          'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Nrg_stadium.jpg/800px-Nrg_stadium.jpg',
+  'Arrowhead Stadium':    'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Aerial_view_of_Arrowhead_Stadium_08-31-2013.jpg/800px-Aerial_view_of_Arrowhead_Stadium_08-31-2013.jpg',
+  'Lincoln Financial Field':'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Lincoln_Financial_Field_%28Aerial_view%29.jpg/800px-Lincoln_Financial_Field_%28Aerial_view%29.jpg',
+  'BMO Field':            'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Toronto_BMO_Field_in_2024.jpg/800px-Toronto_BMO_Field_in_2024.jpg',
+  'BC Place':             'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/BC_Place_2015_Women%27s_FIFA_World_Cup.jpg/800px-BC_Place_2015_Women%27s_FIFA_World_Cup.jpg',
+  'Estadio Azteca':       'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Vista_a%C3%A9rea_del_Estadio_Azteca_-_2026_-_02.jpg/800px-Vista_a%C3%A9rea_del_Estadio_Azteca_-_2026_-_02.jpg',
+  'Estadio Akron':        'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho_%283%29.jpg/800px-Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho_%283%29.jpg',
+  'Estadio BBVA':         'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_6.JPG/800px-Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_6.JPG',
+};
+
+const CITY_PHOTOS = {
+  'New York / New Jersey': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg/800px-View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg',
+  'Los Angeles':           'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Hollywood_Sign_%28Zuschnitt%29.jpg/800px-Hollywood_Sign_%28Zuschnitt%29.jpg',
+  'Dallas':                'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/View_of_Dallas_from_Reunion_Tower_August_2015_05.jpg/800px-View_of_Dallas_from_Reunion_Tower_August_2015_05.jpg',
+  'San Francisco Bay Area':'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/GoldenGateBridge-001.jpg/800px-GoldenGateBridge-001.jpg',
+  'Miami':                 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Miami_collage_20110330.jpg/800px-Miami_collage_20110330.jpg',
+  'Atlanta':               'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/A2ATL20250614-0721_%28cropped%29.jpg/800px-A2ATL20250614-0721_%28cropped%29.jpg',
+  'Seattle':               'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Seattle_Center_as_night_falls.jpg/800px-Seattle_Center_as_night_falls.jpg',
+  'Boston':                'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/ISH_WC_Boston4.jpg/800px-ISH_WC_Boston4.jpg',
+  'Houston':               'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Texas_medical_center.jpg/800px-Texas_medical_center.jpg',
+  'Kansas City':           'https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Kansas_City_-_Downtown_-_panoramio_%2815%29.jpg/800px-Kansas_City_-_Downtown_-_panoramio_%2815%29.jpg',
+  'Philadelphia':          'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Philadelphia_skyline_20240528_%28cropped_2-1%29.jpg/800px-Philadelphia_skyline_20240528_%28cropped_2-1%29.jpg',
+  'Toronto':               'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Toronto_BMO_Field_in_2024.jpg/800px-Toronto_BMO_Field_in_2024.jpg',
+  'Vancouver':             'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Skyline_of_Vancouver%2C_Canada.jpg/800px-Skyline_of_Vancouver%2C_Canada.jpg',
+  'Mexico City':           'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Sobrevuelos_CDMX_HJ2A4913_%2825514321687%29_%28cropped%29.jpg/800px-Sobrevuelos_CDMX_HJ2A4913_%2825514321687%29_%28cropped%29.jpg',
+  'Guadalajara':           'https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Panor%C3%A1mica_Guadalajara_desde_edificio_Bansi_hacia_norte_%28cropped%29.jpg/800px-Panor%C3%A1mica_Guadalajara_desde_edificio_Bansi_hacia_norte_%28cropped%29.jpg',
+  'Monterrey':             'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/View_of_Monterrey_%282015%29.jpg/800px-View_of_Monterrey_%282015%29.jpg',
+};
 
 // ── Host cities ───────────────────────────────────────────────────────────
 const HOST_CITIES = [
@@ -336,19 +375,52 @@ function renderCities() {
   ${Object.entries(byCountry).map(([country, cities]) => `
     <div style="margin-bottom:2rem">
       <div class="scores-section-label">${cities[0].flag} ${country} — ${cities.length} cities</div>
-      <div class="cities-grid">${cities.map(c => `
-        <div class="card city-card" onclick="showCityDetail('${c.city}')" style="cursor:pointer">
-          <div class="city-flag">${c.flag}</div>
+      <div class="cities-grid">${cities.map(c => {
+        const photo = CITY_PHOTOS[c.city] || STADIUM_PHOTOS[c.stadium] || '';
+        return `<div class="card city-card" onclick="showCityDetail('${c.city}')" style="cursor:pointer">
+          ${photo ? `<div class="city-photo" style="background-image:url('${photo}')"><div class="city-photo-overlay"></div><div class="city-photo-flag">${c.flag}</div></div>` : `<div class="city-flag">${c.flag}</div>`}
           <div class="city-info">
             <div class="city-name">${c.city}</div>
             <div class="city-stadium">${c.stadium}</div>
             ${c.highlight ? `<div style="font-size:0.7rem;color:var(--gold);opacity:0.75;margin-bottom:0.35rem">★ ${c.highlight}</div>` : ''}
             <div class="city-meta"><span>🏟 ${c.capacity.toLocaleString()}</span><span>⚽ ${c.matches} matches</span></div>
           </div>
-          <div style="color:var(--text-dim);font-size:0.7rem;align-self:center;flex-shrink:0">›</div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
       </div>
     </div>`).join('')}`;
+}
+
+// ── Live tournament stats (aggregated from match key events) ─────────────
+// Cache for aggregated scorer/card data
+const liveStats = { scorers: {}, yellowCards: {}, redCards: {}, loaded: false };
+
+async function fetchLiveTournamentStats() {
+  const completed = state.schedule.filter(m => m.status === 'post');
+  if (!completed.length) return;
+  const summaries = await Promise.allSettled(completed.map(m => fetchMatchSummary(m.id)));
+  for (const [i, result] of summaries.entries()) {
+    if (result.status !== 'fulfilled' || !result.value) continue;
+    const { keyEvents = [], teamStats } = result.value;
+    const m = completed[i];
+    for (const ev of keyEvents) {
+      if (!ev.athlete) continue;
+      const teamName = ev.ha === 'home' ? m.home?.name : m.away?.name;
+      if (ev.kind === 'goal') {
+        const key = ev.athlete;
+        if (!liveStats.scorers[key]) liveStats.scorers[key] = { name: ev.athlete, goals: 0, team: teamName };
+        liveStats.scorers[key].goals++;
+      } else if (ev.kind === 'yellow') {
+        const key = teamName || 'Unknown';
+        liveStats.yellowCards[key] = (liveStats.yellowCards[key] || 0) + 1;
+      } else if (ev.kind === 'red') {
+        const key = teamName || 'Unknown';
+        liveStats.redCards[key] = (liveStats.redCards[key] || 0) + 1;
+      }
+    }
+  }
+  liveStats.loaded = true;
+  if ($('stats-container')) renderStats();
 }
 
 // ── Render: Statistics ────────────────────────────────────────────────────
@@ -364,7 +436,23 @@ function renderStats() {
 
   // Goals per tournament chart (last 8)
   const chartData = WC_HISTORY.slice(0, 8).reverse();
-  const maxGoals = Math.max(...chartData.map(t => t.goals));
+  const maxHistGoals = Math.max(...chartData.map(t => t.goals));
+
+  // Build live team stat tables from standings
+  const allEntries = state.standings.flatMap(g => g.entries.map(e => ({...e, group: g.name})));
+  const topScorers = allEntries.filter(e => e.gf > 0).sort((a,b) => b.gf - a.gf).slice(0,10);
+  const bestDefense = allEntries.filter(e => e.gp > 0).sort((a,b) => a.ga - b.ga || b.gp - a.gp).slice(0,8);
+  const cleanSheets = allEntries.filter(e => e.gp > 0 && e.ga === 0).sort((a,b) => b.gp - a.gp);
+  const topWinRate  = allEntries.filter(e => e.gp > 0).sort((a,b) => (b.w/b.gp) - (a.w/a.gp) || b.pts - a.pts).slice(0,8);
+  const maxGoals    = topScorers[0]?.gf || 1;
+
+  // Scorer leaders from key events
+  const scorerList = Object.values(liveStats.scorers).sort((a,b) => b.goals - a.goals).slice(0,10);
+  const yellowList  = Object.entries(liveStats.yellowCards).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const redList     = Object.entries(liveStats.redCards).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const maxYellow   = yellowList[0]?.[1] || 1;
+  const totalYellow = Object.values(liveStats.yellowCards).reduce((s,v) => s+v, 0);
+  const totalRed    = Object.values(liveStats.redCards).reduce((s,v) => s+v, 0);
 
   el.innerHTML = `
   <!-- Live 2026 overview -->
@@ -377,13 +465,95 @@ function renderStats() {
     <div class="stat-hero-card"><div class="stat-hero-val">104</div><div class="stat-hero-lbl">Total Matches</div></div>
   </div>
 
+  <!-- Live 2026 team stats -->
+  ${topScorers.length ? `<div class="card" style="margin-bottom:1.25rem">
+    <div class="viz-title">⚽ Top Goal-Scoring Teams — WC 2026</div>
+    ${topScorers.map(e => `<div class="bar-row" style="margin-bottom:0.4rem">
+      <div style="width:120px;font-size:0.78rem;color:var(--text);display:flex;align-items:center;gap:0.35rem">${e.flag} ${e.name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round((e.gf/maxGoals)*100)}%;background:var(--green)"></div></div>
+      <div class="bar-val">${e.gf} <span style="font-size:0.65rem;color:var(--text-dim)">(${e.gp}GP)</span></div>
+    </div>`).join('')}
+  </div>` : ''}
+
+  ${bestDefense.length ? `<div class="card" style="margin-bottom:1.25rem">
+    <div class="viz-title">🛡 Best Defenses — Fewest Goals Conceded</div>
+    ${bestDefense.map(e => `<div class="bar-row" style="margin-bottom:0.4rem">
+      <div style="width:120px;font-size:0.78rem;color:var(--text);display:flex;align-items:center;gap:0.35rem">${e.flag} ${e.name}</div>
+      <div style="font-size:0.78rem;font-weight:600;color:${e.ga===0?'var(--green)':'var(--text)'};width:32px">${e.ga} GA</div>
+      ${e.ga === 0 ? `<span style="font-size:0.7rem;color:var(--green)">✓ Clean sheet${e.gp>1?'s':''}</span>` : ''}
+    </div>`).join('')}
+    ${cleanSheets.length ? `<div style="margin-top:0.5rem;font-size:0.72rem;color:var(--text-dim)">🧤 Clean sheets: ${cleanSheets.map(e => `${e.flag} ${e.name}`).join(' · ')}</div>` : ''}
+  </div>` : ''}
+
+  ${topWinRate.length ? `<div class="card" style="margin-bottom:1.25rem">
+    <div class="viz-title">📈 Win Rate — Teams in Form</div>
+    ${topWinRate.map(e => {
+      const wr = e.gp > 0 ? Math.round((e.w/e.gp)*100) : 0;
+      return `<div class="bar-row" style="margin-bottom:0.4rem">
+        <div style="width:120px;font-size:0.78rem;color:var(--text);display:flex;align-items:center;gap:0.35rem">${e.flag} ${e.name}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${wr}%;background:var(--gold)"></div></div>
+        <div class="bar-val">${wr}%<span style="font-size:0.65rem;color:var(--text-dim);margin-left:4px">${e.w}W-${e.d}D-${e.l}L</span></div>
+      </div>`;
+    }).join('')}
+  </div>` : ''}
+
+  <!-- Goal scorers from live match data -->
+  ${liveStats.loaded ? (scorerList.length ? `<div class="card" style="margin-bottom:1.25rem">
+    <div class="viz-title">⚽ Top Scorers — WC 2026</div>
+    <table class="standings-table">
+      <thead><tr><th style="text-align:left;width:40%">Player</th><th>Goals</th><th style="text-align:left" class="col-hide-mobile">Team</th></tr></thead>
+      <tbody>${scorerList.map((p,i) => `<tr>
+        <td><div class="team-row"><span class="team-pos">${i+1}</span><span style="font-size:0.82rem">${p.name}</span></div></td>
+        <td><strong style="color:var(--gold)">${p.goals}</strong></td>
+        <td class="col-hide-mobile" style="font-size:0.78rem;color:var(--text-mid)">${p.team || ''}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>` : '') : `<div class="card" style="margin-bottom:1.25rem;text-align:center;padding:1.5rem">
+    <div style="font-size:0.82rem;color:var(--text-dim)">⚽ Loading individual scorer data from match events…</div>
+  </div>`}
+
+  <!-- Disciplinary stats -->
+  ${liveStats.loaded && (totalYellow > 0 || totalRed > 0) ? `<div class="card" style="margin-bottom:1.25rem">
+    <div class="viz-title">🟨 Disciplinary — WC 2026</div>
+    <div class="stats-overview" style="margin-bottom:1rem">
+      <div class="stat-hero-card"><div class="stat-hero-val">${totalYellow}</div><div class="stat-hero-lbl">🟨 Yellow Cards</div></div>
+      <div class="stat-hero-card"><div class="stat-hero-val">${totalRed}</div><div class="stat-hero-lbl">🟥 Red Cards</div></div>
+      <div class="stat-hero-card"><div class="stat-hero-val">${played > 0 ? (totalYellow/played).toFixed(1) : '–'}</div><div class="stat-hero-lbl">Yellows/Match</div></div>
+    </div>
+    ${yellowList.length ? `<div class="viz-title" style="font-size:0.75rem;margin-bottom:0.5rem">Most Yellows by Team</div>
+    ${yellowList.map(([team, count]) => `<div class="bar-row" style="margin-bottom:0.3rem">
+      <div style="width:130px;font-size:0.78rem;color:var(--text)">${team}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round((count/maxYellow)*100)}%;background:#f0c040"></div></div>
+      <div class="bar-val">${count}</div>
+    </div>`).join('')}` : ''}
+  </div>` : ''}
+
+  <!-- Group standings summary -->
+  ${allEntries.length ? `<div class="card" style="margin-bottom:1.25rem">
+    <div class="viz-title">🏆 Current Group Leaders</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+      ${state.standings.map(g => {
+        const leader = g.entries[0];
+        if (!leader) return '';
+        return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.75rem;font-size:0.78rem;min-width:160px">
+          <div style="font-size:0.65rem;color:var(--text-dim);margin-bottom:0.2rem">${g.name}</div>
+          <div style="display:flex;align-items:center;gap:0.4rem"><span>${leader.flag}</span><strong>${leader.name}</strong><span style="color:var(--gold);margin-left:auto">${leader.pts}pts</span></div>
+        </div>`;
+      }).filter(Boolean).join('')}
+    </div>
+  </div>` : ''}
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0">
+  <div class="scores-section-label" style="margin-bottom:1rem">📚 All-Time World Cup Records</div>
+
   <!-- Goals trend chart -->
   <div class="card" style="margin-bottom:1.25rem">
     <div class="viz-title">Goals per Tournament (Last 8 World Cups)</div>
     <div class="bar-chart">
       ${chartData.map(t => `<div class="bar-row">
         <div class="bar-label">${t.year}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((t.goals/maxGoals)*100)}%"></div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((t.goals/maxHistGoals)*100)}%"></div></div>
         <div class="bar-val">${t.goals}</div>
         <div style="font-size:0.65rem;color:var(--text-dim);width:60px;text-align:right">(${t.gpg}/g)</div>
       </div>`).join('')}
@@ -512,7 +682,7 @@ function updateMatchDetailStats(m, summary) {
   const el = $('match-detail-stats');
   if (!el) return;
 
-  const { teamStats, broadcasts, odds, videos, lastFive, h2h } = summary;
+  const { teamStats, broadcasts, odds, videos, lastFive, h2h, keyEvents = [], gameInfo = {}, article } = summary;
   const away = teamStats.away || {};
   const home = teamStats.home || {};
 
@@ -631,7 +801,42 @@ function updateMatchDetailStats(m, summary) {
       📡 Broadcasting on: <strong style="color:var(--text)">${broadcastNames.join(' · ')}</strong>
     </div>` : '';
 
-  el.innerHTML = oddsHTML + statsHTML + formHTML + h2hHTML + videosHTML + liveChannelsHTML;
+  // Key events: goals/cards/subs timeline
+  const goals  = keyEvents.filter(e => e.kind === 'goal');
+  const yellows = keyEvents.filter(e => e.kind === 'yellow');
+  const reds    = keyEvents.filter(e => e.kind === 'red');
+  const subs    = keyEvents.filter(e => e.kind === 'sub');
+
+  const kindIcon = { goal:'⚽', yellow:'🟨', red:'🟥', sub:'🔄' };
+
+  const eventsHTML = keyEvents.length ? `
+    <div class="detail-section" style="margin-bottom:1rem">
+      <div class="detail-section-title">📋 Match Timeline</div>
+      <div style="display:flex;flex-direction:column;gap:0.25rem">
+        ${keyEvents.map(e => `
+          <div style="display:flex;align-items:flex-start;gap:0.6rem;font-size:0.78rem;padding:0.28rem 0;border-bottom:1px solid var(--border)">
+            <span style="width:32px;flex-shrink:0;color:var(--text-dim);font-size:0.7rem;padding-top:2px">${e.minute}'</span>
+            <span style="flex-shrink:0">${kindIcon[e.kind] || ''}</span>
+            <span style="flex:1;color:var(--text)">${e.athlete ? `<strong>${e.athlete}</strong> — ` : ''}${e.text}</span>
+            <span style="font-size:0.65rem;color:var(--text-dim);flex-shrink:0">${e.ha === 'home' ? m.home?.name : e.ha === 'away' ? m.away?.name : ''}</span>
+          </div>`).join('')}
+      </div>
+      ${goals.length ? `<div style="margin-top:0.6rem;font-size:0.73rem;color:var(--text-dim)">⚽ ${goals.length} goal${goals.length>1?'s':''} · 🟨 ${yellows.length} yellow${yellows.length!==1?'s':''} · 🟥 ${reds.length} red${reds.length!==1?'s':''} · 🔄 ${subs.length} sub${subs.length!==1?'s':''}</div>` : ''}
+    </div>` : '';
+
+  const attendanceHTML = gameInfo.attendance ? `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.9rem;margin-bottom:0.75rem;font-size:0.78rem">
+      🏟 <strong style="color:var(--text)">${Number(gameInfo.attendance).toLocaleString()}</strong> attendance${gameInfo.venue ? ` · ${gameInfo.venue}` : ''}${gameInfo.city ? `, ${gameInfo.city}` : ''}
+    </div>` : '';
+
+  const articleHTML = article?.body ? `
+    <div class="detail-section" style="margin-bottom:1rem">
+      <div class="detail-section-title">📰 Match Report</div>
+      ${article.headline ? `<div style="font-size:0.85rem;font-weight:600;color:var(--text);margin-bottom:0.4rem">${article.headline}</div>` : ''}
+      <div style="font-size:0.78rem;color:var(--text-dim);line-height:1.7">${article.body.slice(0,800)}${article.body.length>800?'…':''}</div>
+    </div>` : '';
+
+  el.innerHTML = attendanceHTML + eventsHTML + oddsHTML + statsHTML + formHTML + h2hHTML + videosHTML + liveChannelsHTML + articleHTML;
 }
 
 window.generateMatchAnalysis = async function(matchId) {
@@ -650,10 +855,13 @@ window.showCityDetail = function(cityName) {
   if (!city) return;
   const cityMatches = state.schedule.filter(m => m.venue && m.venue.toLowerCase().includes(city.stadium.split(' ')[0].toLowerCase()));
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(city.stadium + ', ' + city.city)}`;
+  const stadiumPhoto = STADIUM_PHOTOS[city.stadium] || '';
+  const cityPhoto    = CITY_PHOTOS[city.city] || '';
   $('detail-modal-title').textContent = `${city.flag} ${city.city}`;
   $('detail-modal-body').innerHTML = `
+    ${stadiumPhoto ? `<div class="modal-hero-photo" style="background-image:url('${stadiumPhoto}')"><div class="modal-hero-overlay"><div class="modal-hero-caption">${city.stadium}</div></div></div>` : ''}
     <div class="detail-section">
-      <div class="detail-hero-stat">${city.stadium}</div>
+      ${!stadiumPhoto ? `<div class="detail-hero-stat">${city.stadium}</div>` : ''}
       ${city.highlight ? `<div class="detail-badge">★ ${city.highlight}</div>` : ''}
       <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.65;margin-top:0.75rem">${city.description}</p>
     </div>
@@ -750,17 +958,20 @@ function renderRoster(roster) {
   }
   const sorted = Object.entries(byPos).sort(([a],[b]) => (posOrder[a]??9) - (posOrder[b]??9));
   el.innerHTML = sorted.map(([pos, players]) => `
-    <div style="margin-bottom:1rem">
-      <div style="font-size:0.68rem;font-weight:600;letter-spacing:0.07em;color:var(--text-dim);text-transform:uppercase;margin-bottom:0.4rem">${pos}s</div>
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:0.68rem;font-weight:600;letter-spacing:0.07em;color:var(--text-dim);text-transform:uppercase;margin-bottom:0.5rem">${pos}s</div>
       <div class="roster-grid">
-        ${players.sort((a,b) => (parseInt(a.number)||99) - (parseInt(b.number)||99)).map(p => `
-          <div class="roster-card">
-            <div class="roster-number">${p.number || '–'}</div>
+        ${players.sort((a,b) => (parseInt(a.number)||99) - (parseInt(b.number)||99)).map(p => {
+          const photoUrl = p.id ? `https://a.espncdn.com/combiner/i?img=/i/headshots/soccer/players/full/${p.id}.png&h=120&w=120&scale=crop` : '';
+          return `<div class="roster-card">
+            ${photoUrl ? `<img class="roster-photo" src="${photoUrl}" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="roster-number" style="display:none">${p.number || '–'}</div>` : `<div class="roster-number">${p.number || '–'}</div>`}
             <div class="roster-info">
               <div class="roster-name">${p.name}</div>
-              <div class="roster-meta">${p.club || ''}${p.age ? ` · ${p.age}y` : ''}</div>
+              <div class="roster-meta">${p.number ? `#${p.number} · ` : ''}${p.club || ''}${p.age ? ` · ${p.age}y` : ''}${p.height ? ` · ${p.height}` : ''}</div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>`).join('');
 }
@@ -835,6 +1046,62 @@ function renderNews() {
   }).join('');
 }
 
+// ── Render: Gallery ───────────────────────────────────────────────────────
+function renderGallery() {
+  const el = $('gallery-container');
+  if (!el || el.dataset.loaded) return;
+  el.dataset.loaded = '1';
+
+  const GALLERY = [
+    // Stadiums
+    { title:'MetLife Stadium', sub:'New York / New Jersey · 82,500 capacity · World Cup Final venue', img: STADIUM_PHOTOS['MetLife Stadium'], section:'scores', label:'View Scores' },
+    { title:'Estadio Azteca', sub:'Mexico City · 87,523 capacity · Only stadium to host 3 WC finals (1970, 1986, 2026)', img: STADIUM_PHOTOS['Estadio Azteca'], section:'cities', label:'View Cities' },
+    { title:'SoFi Stadium', sub:'Los Angeles · 70,240 capacity · Opening Ceremony venue', img: STADIUM_PHOTOS['SoFi Stadium'], section:'cities', label:'View Cities' },
+    { title:'AT&T Stadium', sub:'Dallas · 80,000 capacity · "Jerry World" — largest seating capacity in the tournament', img: STADIUM_PHOTOS['AT&T Stadium'], section:'cities', label:'View Cities' },
+    { title:'Mercedes-Benz Stadium', sub:'Atlanta · 71,000 capacity · Retractable petal roof', img: STADIUM_PHOTOS['Mercedes-Benz Stadium'], section:'cities', label:'View Cities' },
+    { title:'Arrowhead Stadium', sub:'Kansas City · 76,416 capacity · Famous for deafening crowd noise', img: STADIUM_PHOTOS['Arrowhead Stadium'], section:'cities', label:'View Cities' },
+    { title:'Lumen Field', sub:'Seattle · 69,000 capacity · One of the loudest stadiums on Earth', img: STADIUM_PHOTOS['Lumen Field'], section:'cities', label:'View Cities' },
+    { title:'Hard Rock Stadium', sub:'Miami · 64,767 capacity · Tropical World Cup atmosphere', img: STADIUM_PHOTOS['Hard Rock Stadium'], section:'cities', label:'View Cities' },
+    { title:"Levi's Stadium", sub:'San Francisco Bay Area · 68,500 capacity · Silicon Valley meets football', img: STADIUM_PHOTOS["Levi's Stadium"], section:'cities', label:'View Cities' },
+    { title:'NRG Stadium', sub:'Houston · 72,220 capacity · Space City hosts the world', img: STADIUM_PHOTOS['NRG Stadium'], section:'cities', label:'View Cities' },
+    { title:'Gillette Stadium', sub:'Boston · 65,878 capacity · New England football fortress', img: STADIUM_PHOTOS['Gillette Stadium'], section:'cities', label:'View Cities' },
+    { title:'Lincoln Financial Field', sub:'Philadelphia · 69,176 capacity · City of Brotherly Love', img: STADIUM_PHOTOS['Lincoln Financial Field'], section:'cities', label:'View Cities' },
+    { title:'BMO Field', sub:'Toronto · 30,000 capacity · Canada\'s premier football stadium', img: STADIUM_PHOTOS['BMO Field'], section:'cities', label:'View Cities' },
+    { title:'BC Place', sub:'Vancouver · 54,500 capacity · Mountains meet ocean — most scenic venue', img: STADIUM_PHOTOS['BC Place'], section:'cities', label:'View Cities' },
+    { title:'Estadio Akron', sub:'Guadalajara · 49,850 capacity · Shaped like a volcano', img: STADIUM_PHOTOS['Estadio Akron'], section:'cities', label:'View Cities' },
+    { title:'Estadio BBVA', sub:'Monterrey · 53,500 capacity · Dramatic Sierra Madre mountain backdrop', img: STADIUM_PHOTOS['Estadio BBVA'], section:'cities', label:'View Cities' },
+  ].filter(g => g.img);
+
+  const CITY_GALLERY = Object.entries(CITY_PHOTOS).map(([city, img]) => ({
+    title: city, sub: HOST_CITIES.find(c => c.city === city)?.stadium || '', img, section:'cities', label:'View City'
+  }));
+
+  el.innerHTML = `
+    <div class="scores-section-label" style="margin-bottom:1rem">🏟 World Cup 2026 Stadiums</div>
+    <div class="gallery-grid">${GALLERY.map(g => `
+      <div class="gallery-card" onclick="showSection('${g.section}')">
+        <div class="gallery-img" style="background-image:url('${g.img}')">
+          <div class="gallery-overlay">
+            <div class="gallery-title">${g.title}</div>
+            <div class="gallery-sub">${g.sub}</div>
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <div class="scores-section-label" style="margin:2rem 0 1rem">🌆 Host Cities</div>
+    <div class="gallery-grid gallery-grid-cities">${CITY_GALLERY.map(g => `
+      <div class="gallery-card" onclick="showCityDetail('${g.title}')">
+        <div class="gallery-img" style="background-image:url('${g.img}')">
+          <div class="gallery-overlay">
+            <div class="gallery-title">${g.title}</div>
+            <div class="gallery-sub">${g.sub}</div>
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+}
+
 // ── Nav ───────────────────────────────────────────────────────────────────
 window.showSection = function(name) {
   state.activeSection = name;
@@ -844,6 +1111,7 @@ window.showSection = function(name) {
   window.scrollTo({ top:0, behavior:'smooth' });
   if (name === 'map') setTimeout(initMap, 100);
   if (name === 'stats') renderStats();
+  if (name === 'gallery') renderGallery();
 };
 
 window.updateBottomNav = function(name) {
@@ -910,8 +1178,7 @@ async function init() {
   renderCities();
   renderBracket();
 
-  // Load team ID map for roster lookups
-  fetchAllTeams().then(map => { state.teamIdMap = map; });
+  renderStats();
 
   const [matches, standings, news] = await Promise.all([fetchScoreboard(), fetchStandings(), fetchNews(12)]);
   state.matches = matches; state.standings = standings; state.news = news;
@@ -920,6 +1187,8 @@ async function init() {
   fetchSchedule().then(schedule => {
     state.schedule = schedule;
     renderSchedule(); renderTeams();
+    if (state.activeSection === 'stats') renderStats();
+    fetchLiveTournamentStats();
   });
 
   if ($('ai-no-key-hint') && getKey()) $('ai-no-key-hint').style.display = 'none';

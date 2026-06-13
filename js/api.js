@@ -41,12 +41,35 @@ const TEAM_ISO = {
   SWI:'CH', AUT:'AT', SWE:'SE', NOR:'NO', DEN:'DK', POL:'PL', UKR:'UA',
   SRB:'RS', SCO:'GB-SCO', WAL:'GB-WLS', IRL:'IE', SVK:'SK', HUN:'HU',
   CZE:'CZ', GRE:'GR', TUR:'TR', ROU:'RO', ALB:'AL', SLO:'SI', GEO:'GE',
+  RSA:'ZA', ZIM:'ZW', ANG:'AO', MOZ:'MZ', TAN:'TZ', KEN:'KE', ETH:'ET',
+  IDN:'ID', THA:'TH', VIE:'VN', MYS:'MY', PHI:'PH', IND:'IN', PAK:'PK',
+  ISR:'IL', LBN:'LB', JOR:'JO', IRQ:'IQ', OMA:'OM', UAE:'AE', KWT:'KW',
+  UZB:'UZ', KAZ:'KZ', ARM:'AM', AZE:'AZ',
+};
+
+// Regional flags not coverable by 2-letter ISO code (tag-based emoji)
+const SPECIAL_FLAGS = {
+  'GB-ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'GB-SCO': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'GB-WLS': '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
 };
 
 function teamFlag(abbr, displayName) {
   const iso = TEAM_ISO[abbr?.toUpperCase()];
-  if (iso && iso.length === 2) return FLAG(iso);
-  if (abbr && abbr.length >= 2) return FLAG(abbr.slice(0,2));
+  if (iso) {
+    if (SPECIAL_FLAGS[iso]) return SPECIAL_FLAGS[iso];
+    if (iso.length === 2) return FLAG(iso);
+  }
+  // Name-based fallback for British nations
+  const name = (displayName || '').toLowerCase();
+  if (name.includes('england')) return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
+  if (name.includes('scotland')) return '🏴󠁧󠁢󠁳󠁣󠁴󠁿';
+  if (name.includes('wales')) return '🏴󠁧󠁢󠁷󠁬󠁳󠁿';
+  // Attempt: 3-letter FIFA abbr → regional flag (e.g. BRA→BR, USA→US, MEX→MX)
+  if (abbr && abbr.length >= 2) {
+    const guess = abbr.slice(0, 2).toUpperCase();
+    return FLAG(guess);
+  }
   return '⚽';
 }
 
@@ -175,7 +198,36 @@ export async function fetchMatchSummary(eventId) {
       }
     }
 
-    return { teamStats, broadcasts, odds, videos, lastFive, h2h: h2h.slice(0, 5) };
+    // Key events: goals, cards, substitutions
+    const headerCompsForEvents = d.header?.competitions?.[0]?.competitors || [];
+    const homeIdE = headerCompsForEvents.find(c => c.homeAway === 'home')?.team?.id;
+    const keyEvents = (d.keyEvents || []).map(ev => {
+      const type = (ev.type?.text || '').toLowerCase();
+      let kind = null;
+      if (type.includes('goal')) kind = 'goal';
+      else if (type.includes('yellow')) kind = 'yellow';
+      else if (type.includes('red')) kind = 'red';
+      else if (type.includes('sub')) kind = 'sub';
+      if (!kind) return null;
+      const teamId = ev.team?.id || '';
+      const ha = teamId ? (teamId === homeIdE ? 'home' : 'away') : null;
+      const athlete = ev.participants?.[0]?.athlete?.displayName || ev.athleteName || '';
+      const minute = ev.clock?.displayValue || ev.period?.displayValue || '';
+      return { kind, ha, minute, athlete, text: ev.text || ev.shortText || '' };
+    }).filter(Boolean);
+
+    // Game info: attendance, venue
+    const gi = d.gameInfo || {};
+    const gameInfo = {
+      attendance: gi.attendance || null,
+      venue:      gi.venue?.fullName || '',
+      city:       gi.venue?.address?.city || '',
+    };
+
+    // Article / match report
+    const article = d.article ? { headline: d.article.headline || '', body: d.article.story || d.article.description || '' } : null;
+
+    return { teamStats, broadcasts, odds, videos, lastFive, h2h: h2h.slice(0, 5), keyEvents, gameInfo, article };
   } catch (e) {
     console.warn('Match summary fetch failed:', e);
     return null;
@@ -187,6 +239,7 @@ export async function fetchTeamRoster(teamId) {
   try {
     const d = await fetchJSON(`${ESPN_BASE}/${WC_SLUG}/teams/${teamId}/roster`);
     return (d.athletes || []).map(a => ({
+      id:       a.id || '',
       name:     a.displayName || a.shortName || '',
       number:   a.jersey || '',
       position: a.position?.name || '',
