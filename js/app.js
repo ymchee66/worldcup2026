@@ -87,44 +87,47 @@ const BROADCASTS_GUIDE = [
   { region:'🌍 Global',    channels:['FIFA+ (highlights — free)','Official FIFA YouTube channel'], free:'FIFA+ free highlights', link:'https://www.fifa.com/fifaplus/en' },
 ];
 
-// ── Stadium & city photo lookup (Wikimedia Commons) ───────────────────────
-// All URLs verified via Wikipedia REST API — exact cached thumbnail sizes
+// ── Image proxy — routes through weserv.nl CDN to avoid Wikimedia rate limits
+const wp = (wikiPath, w = 600) =>
+  `https://images.weserv.nl/?url=upload.wikimedia.org${wikiPath}&w=${w}&fit=cover&output=jpg`;
+
+// ── Stadium & city photo lookup (Wikimedia Commons via weserv.nl CDN) ────────
 const STADIUM_PHOTOS = {
-  'MetLife Stadium':       'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Metlife_stadium_%28Aerial_view%29.jpg/330px-Metlife_stadium_%28Aerial_view%29.jpg',
-  'SoFi Stadium':          'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/SoFi_Stadium_2023.jpg/330px-SoFi_Stadium_2023.jpg',
-  'AT&T Stadium':          'https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Arlington_June_2020_4_%28AT%26T_Stadium%29.jpg/330px-Arlington_June_2020_4_%28AT%26T_Stadium%29.jpg',
-  "Levi's Stadium":        'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Levi%27s_Stadium_in_February_2016_prior_to_Super_Bowl_50_%2824398261729%29.jpg/330px-Levi%27s_Stadium_in_February_2016_prior_to_Super_Bowl_50_%2824398261729%29.jpg',
-  'Hard Rock Stadium':     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Hard_Rock_Stadium_for_Super_Bowl_LIV_%2849606710103%29.jpg/330px-Hard_Rock_Stadium_for_Super_Bowl_LIV_%2849606710103%29.jpg',
-  'Mercedes-Benz Stadium': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Mercedes_Benz_Stadium_time_lapse_capture_2017-08-13.jpg/330px-Mercedes_Benz_Stadium_time_lapse_capture_2017-08-13.jpg',
-  'Lumen Field':           'https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/2025_FIFA_Club_World_Cup_-_Seattle_Sounders_FC_vs._Atl%C3%A9tico_Madrid_-_05.jpg/330px-2025_FIFA_Club_World_Cup_-_Seattle_Sounders_FC_vs._Atl%C3%A9tico_Madrid_-_05.jpg',
-  'Gillette Stadium':      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Gillette_Stadium_%28Top_View%29.jpg/330px-Gillette_Stadium_%28Top_View%29.jpg',
-  'NRG Stadium':           'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Nrg_stadium.jpg/330px-Nrg_stadium.jpg',
-  'Arrowhead Stadium':     'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Aerial_view_of_Arrowhead_Stadium_08-31-2013.jpg/330px-Aerial_view_of_Arrowhead_Stadium_08-31-2013.jpg',
-  'Lincoln Financial Field':'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Lincoln_Financial_Field_%28Aerial_view%29.jpg/330px-Lincoln_Financial_Field_%28Aerial_view%29.jpg',
-  'BMO Field':             'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Toronto_BMO_Field_in_2024.jpg/330px-Toronto_BMO_Field_in_2024.jpg',
-  'BC Place':              'https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/BC_Place_2015_Women%27s_FIFA_World_Cup.jpg/330px-BC_Place_2015_Women%27s_FIFA_World_Cup.jpg',
-  'Estadio Azteca':        'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Vista_a%C3%A9rea_del_Estadio_Azteca_-_2026_-_02.jpg/330px-Vista_a%C3%A9rea_del_Estadio_Azteca_-_2026_-_02.jpg',
-  'Estadio Akron':         'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho_%283%29.jpg/330px-Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho_%283%29.jpg',
-  'Estadio BBVA':          'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_6.JPG/330px-Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_6.JPG',
+  'MetLife Stadium':       wp('/wikipedia/commons/thumb/0/04/Metlife_stadium_%28Aerial_view%29.jpg/330px-Metlife_stadium_%28Aerial_view%29.jpg'),
+  'SoFi Stadium':          wp('/wikipedia/commons/thumb/b/b3/SoFi_Stadium_2023.jpg/330px-SoFi_Stadium_2023.jpg'),
+  'AT&T Stadium':          wp('/wikipedia/commons/thumb/1/11/Arlington_June_2020_4_%28AT%26T_Stadium%29.jpg/330px-Arlington_June_2020_4_%28AT%26T_Stadium%29.jpg'),
+  "Levi's Stadium":        wp('/wikipedia/commons/thumb/a/a6/Levi%27s_Stadium_in_February_2016_prior_to_Super_Bowl_50_%2824398261729%29.jpg/330px-Levi%27s_Stadium_in_February_2016_prior_to_Super_Bowl_50_%2824398261729%29.jpg'),
+  'Hard Rock Stadium':     wp('/wikipedia/commons/thumb/c/ce/Hard_Rock_Stadium_for_Super_Bowl_LIV_%2849606710103%29.jpg/330px-Hard_Rock_Stadium_for_Super_Bowl_LIV_%2849606710103%29.jpg'),
+  'Mercedes-Benz Stadium': wp('/wikipedia/commons/thumb/1/10/Mercedes_Benz_Stadium_time_lapse_capture_2017-08-13.jpg/330px-Mercedes_Benz_Stadium_time_lapse_capture_2017-08-13.jpg'),
+  'Lumen Field':           wp('/wikipedia/commons/thumb/9/98/2025_FIFA_Club_World_Cup_-_Seattle_Sounders_FC_vs._Atl%C3%A9tico_Madrid_-_05.jpg/330px-2025_FIFA_Club_World_Cup_-_Seattle_Sounders_FC_vs._Atl%C3%A9tico_Madrid_-_05.jpg'),
+  'Gillette Stadium':      wp('/wikipedia/commons/thumb/d/db/Gillette_Stadium_%28Top_View%29.jpg/330px-Gillette_Stadium_%28Top_View%29.jpg'),
+  'NRG Stadium':           wp('/wikipedia/commons/thumb/3/3e/Nrg_stadium.jpg/330px-Nrg_stadium.jpg'),
+  'Arrowhead Stadium':     wp('/wikipedia/commons/thumb/a/ac/Aerial_view_of_Arrowhead_Stadium_08-31-2013.jpg/330px-Aerial_view_of_Arrowhead_Stadium_08-31-2013.jpg'),
+  'Lincoln Financial Field':wp('/wikipedia/commons/thumb/a/a1/Lincoln_Financial_Field_%28Aerial_view%29.jpg/330px-Lincoln_Financial_Field_%28Aerial_view%29.jpg'),
+  'BMO Field':             wp('/wikipedia/commons/thumb/9/91/Toronto_BMO_Field_in_2024.jpg/330px-Toronto_BMO_Field_in_2024.jpg'),
+  'BC Place':              wp('/wikipedia/commons/thumb/f/ff/BC_Place_2015_Women%27s_FIFA_World_Cup.jpg/330px-BC_Place_2015_Women%27s_FIFA_World_Cup.jpg'),
+  'Estadio Azteca':        wp('/wikipedia/commons/thumb/0/07/Vista_a%C3%A9rea_del_Estadio_Azteca_-_2026_-_02.jpg/330px-Vista_a%C3%A9rea_del_Estadio_Azteca_-_2026_-_02.jpg'),
+  'Estadio Akron':         wp('/wikipedia/commons/thumb/1/10/Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho_%283%29.jpg/330px-Estadio_Akron_02-07-2022_cabecera_sur_lado_derecho_%283%29.jpg'),
+  'Estadio BBVA':          wp('/wikipedia/commons/thumb/5/57/Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_6.JPG/330px-Mexico_Guadalupe_Monterrey_Estadio_BBVA_Bancomer_fifa_world_cup_2026_6.JPG'),
 };
 
 const CITY_PHOTOS = {
-  'New York / New Jersey': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg/330px-View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg',
-  'Los Angeles':           'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Hollywood_Sign_%28Zuschnitt%29.jpg/330px-Hollywood_Sign_%28Zuschnitt%29.jpg',
-  'Dallas':                'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/View_of_Dallas_from_Reunion_Tower_August_2015_05.jpg/330px-View_of_Dallas_from_Reunion_Tower_August_2015_05.jpg',
-  'San Francisco Bay Area':'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/San_Francisco_Downtown_Aerial%2C_August_2025.jpg/330px-San_Francisco_Downtown_Aerial%2C_August_2025.jpg',
-  'Miami':                 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Villa_Vizcaya_20110228.jpg/330px-Villa_Vizcaya_20110228.jpg',
-  'Atlanta':               'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/A2ATL20250614-0721_%28cropped%29.jpg/330px-A2ATL20250614-0721_%28cropped%29.jpg',
-  'Seattle':               'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Seattle_Center_as_night_falls.jpg/330px-Seattle_Center_as_night_falls.jpg',
-  'Boston':                'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/ISH_WC_Boston4.jpg/330px-ISH_WC_Boston4.jpg',
-  'Houston':               'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Texas_medical_center.jpg/330px-Texas_medical_center.jpg',
-  'Kansas City':           'https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Kansas_City_-_Downtown_-_panoramio_%2815%29.jpg/330px-Kansas_City_-_Downtown_-_panoramio_%2815%29.jpg',
-  'Philadelphia':          'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Philadelphia_skyline_20240528_%28cropped_2-1%29.jpg/330px-Philadelphia_skyline_20240528_%28cropped_2-1%29.jpg',
-  'Toronto':               'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Toronto_Skyline_from_Snake_Island%2C_February_28_2026_%2808%29.jpg/330px-Toronto_Skyline_from_Snake_Island%2C_February_28_2026_%2808%29.jpg',
-  'Vancouver':             'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Skyline_of_Vancouver%2C_Canada.jpg/330px-Skyline_of_Vancouver%2C_Canada.jpg',
-  'Mexico City':           'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Sobrevuelos_CDMX_HJ2A4913_%2825514321687%29_%28cropped%29.jpg/330px-Sobrevuelos_CDMX_HJ2A4913_%2825514321687%29_%28cropped%29.jpg',
-  'Guadalajara':           'https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Panor%C3%A1mica_Guadalajara_desde_edificio_Bansi_hacia_norte_%28cropped%29.jpg/330px-Panor%C3%A1mica_Guadalajara_desde_edificio_Bansi_hacia_norte_%28cropped%29.jpg',
-  'Monterrey':             'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/View_of_Monterrey_%282015%29.jpg/330px-View_of_Monterrey_%282015%29.jpg',
+  'New York / New Jersey': wp('/wikipedia/commons/thumb/7/7a/View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg/330px-View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg'),
+  'Los Angeles':           wp('/wikipedia/commons/thumb/5/5a/Hollywood_Sign_%28Zuschnitt%29.jpg/330px-Hollywood_Sign_%28Zuschnitt%29.jpg'),
+  'Dallas':                wp('/wikipedia/commons/thumb/0/03/View_of_Dallas_from_Reunion_Tower_August_2015_05.jpg/330px-View_of_Dallas_from_Reunion_Tower_August_2015_05.jpg'),
+  'San Francisco Bay Area':wp('/wikipedia/commons/thumb/f/f9/San_Francisco_Downtown_Aerial%2C_August_2025.jpg/330px-San_Francisco_Downtown_Aerial%2C_August_2025.jpg'),
+  'Miami':                 wp('/wikipedia/commons/thumb/2/25/Villa_Vizcaya_20110228.jpg/330px-Villa_Vizcaya_20110228.jpg'),
+  'Atlanta':               wp('/wikipedia/commons/thumb/c/c8/A2ATL20250614-0721_%28cropped%29.jpg/330px-A2ATL20250614-0721_%28cropped%29.jpg'),
+  'Seattle':               wp('/wikipedia/commons/thumb/5/58/Seattle_Center_as_night_falls.jpg/330px-Seattle_Center_as_night_falls.jpg'),
+  'Boston':                wp('/wikipedia/commons/thumb/9/96/ISH_WC_Boston4.jpg/330px-ISH_WC_Boston4.jpg'),
+  'Houston':               wp('/wikipedia/commons/thumb/a/a3/Texas_medical_center.jpg/330px-Texas_medical_center.jpg'),
+  'Kansas City':           wp('/wikipedia/commons/thumb/7/79/Kansas_City_-_Downtown_-_panoramio_%2815%29.jpg/330px-Kansas_City_-_Downtown_-_panoramio_%2815%29.jpg'),
+  'Philadelphia':          wp('/wikipedia/commons/thumb/1/19/Philadelphia_skyline_20240528_%28cropped_2-1%29.jpg/330px-Philadelphia_skyline_20240528_%28cropped_2-1%29.jpg'),
+  'Toronto':               wp('/wikipedia/commons/thumb/1/1c/Toronto_Skyline_from_Snake_Island%2C_February_28_2026_%2808%29.jpg/330px-Toronto_Skyline_from_Snake_Island%2C_February_28_2026_%2808%29.jpg'),
+  'Vancouver':             wp('/wikipedia/commons/thumb/3/33/Skyline_of_Vancouver%2C_Canada.jpg/330px-Skyline_of_Vancouver%2C_Canada.jpg'),
+  'Mexico City':           wp('/wikipedia/commons/thumb/4/4f/Sobrevuelos_CDMX_HJ2A4913_%2825514321687%29_%28cropped%29.jpg/330px-Sobrevuelos_CDMX_HJ2A4913_%2825514321687%29_%28cropped%29.jpg'),
+  'Guadalajara':           wp('/wikipedia/commons/thumb/3/38/Panor%C3%A1mica_Guadalajara_desde_edificio_Bansi_hacia_norte_%28cropped%29.jpg/330px-Panor%C3%A1mica_Guadalajara_desde_edificio_Bansi_hacia_norte_%28cropped%29.jpg'),
+  'Monterrey':             wp('/wikipedia/commons/thumb/d/de/View_of_Monterrey_%282015%29.jpg/330px-View_of_Monterrey_%282015%29.jpg'),
 };
 
 // ── Host cities ───────────────────────────────────────────────────────────
@@ -1051,61 +1054,68 @@ function renderNews() {
 }
 
 // ── Render: Gallery ───────────────────────────────────────────────────────
+function galleryCard(g, clickAttr) {
+  return `<div class="gallery-card" ${clickAttr}>
+    <div class="gallery-img">
+      <img src="${g.img}" alt="${g.title}" loading="lazy"
+           onerror="this.style.opacity='0';this.nextElementSibling.style.background='var(--bg3)'">
+      <div class="gallery-overlay">
+        <div class="gallery-title">${g.title}</div>
+        <div class="gallery-sub">${g.sub}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderGallery() {
   const el = $('gallery-container');
   if (!el || el.dataset.loaded) return;
   el.dataset.loaded = '1';
 
+  // Real WC 2026 match & tournament photos via weserv.nl CDN
+  const MATCH_PHOTOS = [
+    { title:'USA vs Paraguay', sub:'Group A · Match 4 · MetLife Stadium, New York · Jun 14, 2026', img: wp('/wikipedia/commons/thumb/6/6d/2026_FIFA_World_Cup_Match_4%2C_United_States_v_Paraguay_%282%29.jpg/640px-2026_FIFA_World_Cup_Match_4%2C_United_States_v_Paraguay_%282%29.jpg', 700) },
+    { title:'USA vs Paraguay — Action', sub:'Group A · Match 4 · MetLife Stadium · Jun 14, 2026', img: wp('/wikipedia/commons/thumb/0/05/2026_FIFA_World_Cup_Match_4%2C_United_States_v_Paraguay_%281%29.jpg/640px-2026_FIFA_World_Cup_Match_4%2C_United_States_v_Paraguay_%281%29.jpg', 700) },
+    { title:'MetLife Stadium — Match Day', sub:'Group A · 3 hours before kick-off · New York / New Jersey', img: wp('/wikipedia/commons/thumb/5/5b/2026_FIFA_World_Cup_Match_4%2C_United_States_v_Paraguay_%28stadium_3_hours_before%29.jpg/640px-2026_FIFA_World_Cup_Match_4%2C_United_States_v_Paraguay_%28stadium_3_hours_before%29.jpg', 700) },
+    { title:'Morocco vs Niger — Attack', sub:'WC 2026 Qualifier · Match action at full pace', img: wp('/wikipedia/commons/thumb/f/fe/World_Cup_2026_Qualifiers_%28Morocco_v_Niger%29_5.jpg/640px-World_Cup_2026_Qualifiers_%28Morocco_v_Niger%29_5.jpg', 700) },
+    { title:'Morocco vs Niger — Midfield', sub:'WC 2026 Qualifier · Intense qualifying battle', img: wp('/wikipedia/commons/thumb/8/8d/World_Cup_2026_Qualifiers_%28Morocco_v_Niger%29_1.jpg/640px-World_Cup_2026_Qualifiers_%28Morocco_v_Niger%29_1.jpg', 700) },
+    { title:'Morocco vs Niger — Duel', sub:'WC 2026 Qualifier · Physical contest for the ball', img: wp('/wikipedia/commons/thumb/2/2e/World_Cup_2026_Qualifiers_%28Morocco_v_Niger%29_25.jpg/640px-World_Cup_2026_Qualifiers_%28Morocco_v_Niger%29_25.jpg', 700) },
+  ];
+
   const GALLERY = [
-    // Stadiums
-    { title:'MetLife Stadium', sub:'New York / New Jersey · 82,500 capacity · World Cup Final venue', img: STADIUM_PHOTOS['MetLife Stadium'], section:'scores', label:'View Scores' },
-    { title:'Estadio Azteca', sub:'Mexico City · 87,523 capacity · Only stadium to host 3 WC finals (1970, 1986, 2026)', img: STADIUM_PHOTOS['Estadio Azteca'], section:'cities', label:'View Cities' },
-    { title:'SoFi Stadium', sub:'Los Angeles · 70,240 capacity · Opening Ceremony venue', img: STADIUM_PHOTOS['SoFi Stadium'], section:'cities', label:'View Cities' },
-    { title:'AT&T Stadium', sub:'Dallas · 80,000 capacity · "Jerry World" — largest seating capacity in the tournament', img: STADIUM_PHOTOS['AT&T Stadium'], section:'cities', label:'View Cities' },
-    { title:'Mercedes-Benz Stadium', sub:'Atlanta · 71,000 capacity · Retractable petal roof', img: STADIUM_PHOTOS['Mercedes-Benz Stadium'], section:'cities', label:'View Cities' },
-    { title:'Arrowhead Stadium', sub:'Kansas City · 76,416 capacity · Famous for deafening crowd noise', img: STADIUM_PHOTOS['Arrowhead Stadium'], section:'cities', label:'View Cities' },
-    { title:'Lumen Field', sub:'Seattle · 69,000 capacity · One of the loudest stadiums on Earth', img: STADIUM_PHOTOS['Lumen Field'], section:'cities', label:'View Cities' },
-    { title:'Hard Rock Stadium', sub:'Miami · 64,767 capacity · Tropical World Cup atmosphere', img: STADIUM_PHOTOS['Hard Rock Stadium'], section:'cities', label:'View Cities' },
-    { title:"Levi's Stadium", sub:'San Francisco Bay Area · 68,500 capacity · Silicon Valley meets football', img: STADIUM_PHOTOS["Levi's Stadium"], section:'cities', label:'View Cities' },
-    { title:'NRG Stadium', sub:'Houston · 72,220 capacity · Space City hosts the world', img: STADIUM_PHOTOS['NRG Stadium'], section:'cities', label:'View Cities' },
-    { title:'Gillette Stadium', sub:'Boston · 65,878 capacity · New England football fortress', img: STADIUM_PHOTOS['Gillette Stadium'], section:'cities', label:'View Cities' },
-    { title:'Lincoln Financial Field', sub:'Philadelphia · 69,176 capacity · City of Brotherly Love', img: STADIUM_PHOTOS['Lincoln Financial Field'], section:'cities', label:'View Cities' },
-    { title:'BMO Field', sub:'Toronto · 30,000 capacity · Canada\'s premier football stadium', img: STADIUM_PHOTOS['BMO Field'], section:'cities', label:'View Cities' },
-    { title:'BC Place', sub:'Vancouver · 54,500 capacity · Mountains meet ocean — most scenic venue', img: STADIUM_PHOTOS['BC Place'], section:'cities', label:'View Cities' },
-    { title:'Estadio Akron', sub:'Guadalajara · 49,850 capacity · Shaped like a volcano', img: STADIUM_PHOTOS['Estadio Akron'], section:'cities', label:'View Cities' },
-    { title:'Estadio BBVA', sub:'Monterrey · 53,500 capacity · Dramatic Sierra Madre mountain backdrop', img: STADIUM_PHOTOS['Estadio BBVA'], section:'cities', label:'View Cities' },
+    { title:'MetLife Stadium', sub:'New York / New Jersey · 82,500 · World Cup Final venue', img: STADIUM_PHOTOS['MetLife Stadium'], click: "showSection('scores')" },
+    { title:'Estadio Azteca', sub:'Mexico City · 87,523 · Only stadium to host 3 WC finals', img: STADIUM_PHOTOS['Estadio Azteca'], click: "showSection('cities')" },
+    { title:'SoFi Stadium', sub:'Los Angeles · 70,240 · Opening Ceremony venue', img: STADIUM_PHOTOS['SoFi Stadium'], click: "showSection('cities')" },
+    { title:'AT&T Stadium', sub:'Dallas · 80,000 · Largest seating capacity in tournament', img: STADIUM_PHOTOS['AT&T Stadium'], click: "showSection('cities')" },
+    { title:'Mercedes-Benz Stadium', sub:'Atlanta · 71,000 · Retractable petal roof', img: STADIUM_PHOTOS['Mercedes-Benz Stadium'], click: "showSection('cities')" },
+    { title:'Arrowhead Stadium', sub:'Kansas City · 76,416 · Loudest crowd in the NFL', img: STADIUM_PHOTOS['Arrowhead Stadium'], click: "showSection('cities')" },
+    { title:'Lumen Field', sub:'Seattle · 69,000 · One of the loudest stadiums on Earth', img: STADIUM_PHOTOS['Lumen Field'], click: "showSection('cities')" },
+    { title:'Hard Rock Stadium', sub:'Miami · 64,767 · Tropical World Cup atmosphere', img: STADIUM_PHOTOS['Hard Rock Stadium'], click: "showSection('cities')" },
+    { title:"Levi's Stadium", sub:'San Francisco Bay Area · 68,500 · Silicon Valley', img: STADIUM_PHOTOS["Levi's Stadium"], click: "showSection('cities')" },
+    { title:'NRG Stadium', sub:'Houston · 72,220 · Space City hosts the world', img: STADIUM_PHOTOS['NRG Stadium'], click: "showSection('cities')" },
+    { title:'Gillette Stadium', sub:'Boston · 65,878 · New England football fortress', img: STADIUM_PHOTOS['Gillette Stadium'], click: "showSection('cities')" },
+    { title:'Lincoln Financial Field', sub:"Philadelphia · 69,176 · City of Brotherly Love", img: STADIUM_PHOTOS['Lincoln Financial Field'], click: "showSection('cities')" },
+    { title:'BMO Field', sub:"Toronto · 30,000 · Canada's premier football stadium", img: STADIUM_PHOTOS['BMO Field'], click: "showSection('cities')" },
+    { title:'BC Place', sub:'Vancouver · 54,500 · Mountains meet ocean', img: STADIUM_PHOTOS['BC Place'], click: "showSection('cities')" },
+    { title:'Estadio Akron', sub:'Guadalajara · 49,850 · Shaped like a volcano', img: STADIUM_PHOTOS['Estadio Akron'], click: "showSection('cities')" },
+    { title:'Estadio BBVA', sub:'Monterrey · 53,500 · Sierra Madre mountain backdrop', img: STADIUM_PHOTOS['Estadio BBVA'], click: "showSection('cities')" },
   ].filter(g => g.img);
 
   const CITY_GALLERY = Object.entries(CITY_PHOTOS).map(([city, img]) => ({
-    title: city, sub: HOST_CITIES.find(c => c.city === city)?.stadium || '', img, section:'cities', label:'View City'
+    title: city, sub: HOST_CITIES.find(c => c.city === city)?.stadium || '', img,
+    click: `showCityDetail('${city}')`,
   }));
 
   el.innerHTML = `
-    <div class="scores-section-label" style="margin-bottom:1rem">🏟 World Cup 2026 Stadiums</div>
-    <div class="gallery-grid">${GALLERY.map(g => `
-      <div class="gallery-card" onclick="showSection('${g.section}')">
-        <div class="gallery-img">
-          <img src="${g.img}" alt="${g.title}" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'">
-          <div class="gallery-overlay">
-            <div class="gallery-title">${g.title}</div>
-            <div class="gallery-sub">${g.sub}</div>
-          </div>
-        </div>
-      </div>`).join('')}
+    <div class="scores-section-label" style="margin-bottom:1rem">⚽ World Cup 2026 — Match Photos</div>
+    <div class="gallery-grid">${MATCH_PHOTOS.map(g => galleryCard(g, `onclick="${g.click || 'showSection(\'scores\')'}"`)  .join('')}
     </div>
 
+    <div class="scores-section-label" style="margin:2rem 0 1rem">🏟 Host Stadiums</div>
+    <div class="gallery-grid">${GALLERY.map(g => galleryCard(g, `onclick="${g.click}"`)).join('')}</div>
+
     <div class="scores-section-label" style="margin:2rem 0 1rem">🌆 Host Cities</div>
-    <div class="gallery-grid gallery-grid-cities">${CITY_GALLERY.map(g => `
-      <div class="gallery-card" onclick="showCityDetail('${g.title}')">
-        <div class="gallery-img">
-          <img src="${g.img}" alt="${g.title}" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'">
-          <div class="gallery-overlay">
-            <div class="gallery-title">${g.title}</div>
-            <div class="gallery-sub">${g.sub}</div>
-          </div>
-        </div>
-      </div>`).join('')}
-    </div>`;
+    <div class="gallery-grid">${CITY_GALLERY.map(g => galleryCard(g, `onclick="${g.click}"`)).join('')}</div>`;
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────
