@@ -250,6 +250,7 @@ export async function fetchTeamRoster(teamId) {
     const d = await fetchJSON(`${ESPN_BASE}/${WC_SLUG}/teams/${teamId}/roster`);
     return (d.athletes || []).map(a => ({
       id:       a.id || '',
+      photo:    a.headshot?.href || (a.id ? `https://a.espncdn.com/i/headshots/soccer/players/full/${a.id}.png` : ''),
       name:     a.displayName || a.shortName || '',
       number:   a.jersey || '',
       position: a.position?.name || '',
@@ -257,10 +258,11 @@ export async function fetchTeamRoster(teamId) {
       age:      a.age || null,
       birthDate:a.birthDate || '',
       club:     a.clubs?.[0]?.displayName || '',
-      nationality: a.citizenship || '',
+      nationality: a.citizenship || a.citizenshipCountry?.displayName || '',
       height:   a.displayHeight || '',
       weight:   a.displayWeight || '',
       caps:     a.experience?.years || null,
+      birthPlace: [a.birthPlace?.city, a.birthPlace?.country?.displayName].filter(Boolean).join(', '),
     }));
   } catch (e) {
     console.warn('Roster fetch failed:', e);

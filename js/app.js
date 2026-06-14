@@ -952,7 +952,11 @@ window.showTeamDetail = async function(teamName) {
   }
 };
 
+// Store roster globally so player modal can look up by name
+let _currentRoster = [];
+
 function renderRoster(roster) {
+  _currentRoster = roster;
   const el = $('roster-container');
   if (!el) return;
   if (!roster.length) { el.innerHTML = '<div style="font-size:0.78rem;color:var(--text-dim)">No squad data available yet.</div>'; return; }
@@ -969,19 +973,49 @@ function renderRoster(roster) {
       <div style="font-size:0.68rem;font-weight:600;letter-spacing:0.07em;color:var(--text-dim);text-transform:uppercase;margin-bottom:0.5rem">${pos}s</div>
       <div class="roster-grid">
         ${players.sort((a,b) => (parseInt(a.number)||99) - (parseInt(b.number)||99)).map(p => {
-          const photoUrl = p.id ? `https://a.espncdn.com/combiner/i?img=/i/headshots/soccer/players/full/${p.id}.png&h=120&w=120&scale=crop` : '';
-          return `<div class="roster-card">
-            ${photoUrl ? `<img class="roster-photo" src="${photoUrl}" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-              <div class="roster-number" style="display:none">${p.number || '–'}</div>` : `<div class="roster-number">${p.number || '–'}</div>`}
+          const idx = _currentRoster.indexOf(p);
+          return `<div class="roster-card" onclick="showPlayerDetail(${idx})" style="cursor:pointer">
+            ${p.photo
+              ? `<img class="roster-photo" src="${p.photo}" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                 <div class="roster-number" style="display:none">${p.number || '–'}</div>`
+              : `<div class="roster-number">${p.number || '–'}</div>`}
             <div class="roster-info">
               <div class="roster-name">${p.name}</div>
-              <div class="roster-meta">${p.number ? `#${p.number} · ` : ''}${p.club || ''}${p.age ? ` · ${p.age}y` : ''}${p.height ? ` · ${p.height}` : ''}</div>
+              <div class="roster-meta">${p.number ? `#${p.number} · ` : ''}${p.position || ''}${p.club ? ` · ${p.club}` : ''}${p.age ? ` · ${p.age}y` : ''}</div>
             </div>
           </div>`;
         }).join('')}
       </div>
     </div>`).join('');
 }
+
+window.showPlayerDetail = function(idx) {
+  const p = _currentRoster[idx];
+  if (!p) return;
+  $('detail-modal-title').textContent = p.name;
+  $('detail-modal-body').innerHTML = `
+    <div style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:1.5rem">
+      <div style="flex-shrink:0">
+        ${p.photo
+          ? `<img src="${p.photo}" alt="${p.name}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;background:var(--bg2);display:block" onerror="this.style.display='none'">`
+          : `<div style="width:120px;height:120px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--text-dim)">#${p.number||'?'}</div>`}
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:1.5rem;font-weight:700;margin-bottom:0.25rem">${p.name}</div>
+        <div style="font-size:0.9rem;color:var(--gold);font-weight:600;margin-bottom:1rem">${p.position || ''}${p.number ? ` · #${p.number}` : ''}</div>
+        <div class="player-detail-grid">
+          ${p.club       ? `<div class="pd-row"><span class="pd-lbl">Club</span><span class="pd-val">${p.club}</span></div>` : ''}
+          ${p.nationality? `<div class="pd-row"><span class="pd-lbl">Nationality</span><span class="pd-val">${p.nationality}</span></div>` : ''}
+          ${p.age        ? `<div class="pd-row"><span class="pd-lbl">Age</span><span class="pd-val">${p.age}</span></div>` : ''}
+          ${p.birthDate  ? `<div class="pd-row"><span class="pd-lbl">Born</span><span class="pd-val">${new Date(p.birthDate).toLocaleDateString([], {year:'numeric',month:'long',day:'numeric'})}</span></div>` : ''}
+          ${p.birthPlace ? `<div class="pd-row"><span class="pd-lbl">Birthplace</span><span class="pd-val">${p.birthPlace}</span></div>` : ''}
+          ${p.height     ? `<div class="pd-row"><span class="pd-lbl">Height</span><span class="pd-val">${p.height}</span></div>` : ''}
+          ${p.weight     ? `<div class="pd-row"><span class="pd-lbl">Weight</span><span class="pd-val">${p.weight}</span></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  $('detail-modal').classList.add('open');
+};
 
 window.closeDetailModal = function() { $('detail-modal').classList.remove('open'); };
 document.addEventListener('click', e => {
