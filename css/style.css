@@ -461,7 +461,7 @@ nav {
 /* ── Bottom nav ─────────────────────────────────────────────────── */
 .bottom-nav { position:fixed;bottom:0;left:0;right:0;top:auto;z-index:200;background:rgba(8,12,20,0.97);backdrop-filter:blur(12px);border-top:1px solid var(--border); }
 .bottom-nav-inner { display:flex;align-items:stretch;height:62px; }
-.bottom-nav-btn { flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.18rem;background:none;border:none;color:var(--text-dim);font-size:0.52rem;letter-spacing:0.02em;cursor:pointer;padding:0.2rem 0.05rem;transition:color var(--transition);min-width:0; }
+.bottom-nav-btn { flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.22rem;background:none;border:none;color:var(--text-dim);font-size:0.65rem;letter-spacing:0.02em;cursor:pointer;padding:0.25rem 0.25rem;transition:color var(--transition);min-width:0; }
 .bottom-nav-btn.active { color:var(--gold); }
 .bnav-icon { font-size:1.1rem;line-height:1; }
 
