@@ -1104,19 +1104,20 @@ function renderBracket() {
     byGroup[letter] = g.entries; // pre-sorted by pos
   }
 
-  // Return candidates for an ESPN placeholder team name.
+  // Return candidates for an ESPN placeholder team displayName.
   // confirmed=true means group finished and position is locked.
   // leader=true means currently in that position but group not done.
-  function candidates(teamName) {
+  function candidates(displayName) {
+    if (!displayName) return null;
     let m;
 
-    if (m = teamName.match(/^Group ([A-L]) Winner$/)) {
-      return posCandidates(byGroup[m[1]] || [], 1, 'W');
+    if (m = displayName.match(/^Group ([A-L]) Winner$/i)) {
+      return posCandidates(byGroup[m[1]] || [], 1, 'Winner');
     }
-    if (m = teamName.match(/^Group ([A-L]) 2nd Place$/)) {
-      return posCandidates(byGroup[m[1]] || [], 2, '2nd');
+    if (m = displayName.match(/^Group ([A-L]) 2nd Place$/i)) {
+      return posCandidates(byGroup[m[1]] || [], 2, '2nd Place');
     }
-    if (m = teamName.match(/^Third Place Group ([A-L/]+)$/)) {
+    if (m = displayName.match(/Third Place Group ([A-L/]+)/i)) {
       const letters = m[1].split('/');
       const thirds = letters.map(l => {
         const e = (byGroup[l] || [])[2]; // 3rd in that group
@@ -1156,7 +1157,7 @@ function renderBracket() {
 
   // Render one team row inside a slot
   function teamRow(team, winnerClass) {
-    const cands = team?.name ? candidates(team.name) : null;
+    const cands = team?.displayName ? candidates(team.displayName) : null;
     if (!cands) {
       // Real (determined) team
       const logo = team?.logo
@@ -1168,7 +1169,7 @@ function renderBracket() {
     }
     // Placeholder: show candidates
     if (!cands.length) {
-      return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.name}</span></div>`;
+      return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.displayName||team.name}</span></div>`;
     }
     const rows = cands.map(c => {
       const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
@@ -1179,7 +1180,7 @@ function renderBracket() {
       </div>`;
     }).join('');
     return `<div class="bk-team bk-cands">
-      <div class="bk-cand-lbl">${team.name}</div>
+      <div class="bk-cand-lbl">${team.displayName||team.name}</div>
       ${rows}
     </div>`;
   }
@@ -1204,13 +1205,13 @@ function renderBracket() {
     // For confirmed matches, add score to team row
     const awayScore = (isFT||isLive) ? `<span class="bk-score">${m.away?.score??''}</span>` : '';
     const homeScore = (isFT||isLive) ? `<span class="bk-score">${m.home?.score??''}</span>` : '';
-    const awayRow = (isFT||isLive||isPre) && !candidates(m.away?.name||'')
+    const awayRow = !candidates(m.away?.displayName||'')
       ? `<div class="bk-team${awayWon?' bk-winner':''}">
           ${m.away?.logo ? `<img class="bk-logo" src="${m.away.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${m.away?.flag||'⚽'}</span>` : `<span class="bk-flag">${m.away?.flag||'⚽'}</span>`}
           <span class="bk-name">${m.away?.name||'TBD'}</span>${awayScore}
         </div>`
       : teamRow(m.away, awayWon ? 'bk-winner' : '');
-    const homeRow = (isFT||isLive||isPre) && !candidates(m.home?.name||'')
+    const homeRow = !candidates(m.home?.displayName||'')
       ? `<div class="bk-team${homeWon?' bk-winner':''}">
           ${m.home?.logo ? `<img class="bk-logo" src="${m.home.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${m.home?.flag||'⚽'}</span>` : `<span class="bk-flag">${m.home?.flag||'⚽'}</span>`}
           <span class="bk-name">${m.home?.name||'TBD'}</span>${homeScore}
