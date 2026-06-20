@@ -1199,18 +1199,19 @@ function renderBracket() {
           thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false });
         }
       } else {
-        for (let i = 1; i < grp.length; i++) { // indices 1,2,3 → 2nd, 3rd, 4th
+        for (let i = 0; i < grp.length; i++) { // all positions
           const team = grp[i];
           if (!team || committedTeams.has(team.name)) continue;
           const teamMax = team.pts + (3 - team.gp) * 3;
 
-          if (i === 1) {
-            // Currently 2nd: only include if at least one team below can overtake them
-            // (pushing them down to 3rd). Use >= so pts ties count.
-            const canBeOvertaken = grp.slice(2).some(e =>
+          if (i <= 1) {
+            // Currently 1st or 2nd: can fall to 3rd only if enough teams below can overtake.
+            // Need (2-i) teams from below to surpass this team's current pts.
+            const needed = 2 - i;
+            const canOvertake = grp.slice(i + 1).filter(e =>
               !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) >= team.pts
             );
-            if (!canBeOvertaken) continue;
+            if (canOvertake.length < needed) continue;
           } else if (i === 3) {
             // Currently 4th: only include if they can reach 3rd's current points.
             if (!current3rd || teamMax < current3rd.pts) continue;
