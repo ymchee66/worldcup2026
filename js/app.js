@@ -1183,8 +1183,8 @@ function renderBracket() {
   }
 
   // Teams that may qualify as a 3rd-place finisher from the given group letters.
-  // Checks positions 3 AND 4: a team currently 4th can still overtake 3rd.
-  // Committed teams (e.g. Mexico) are skipped regardless of their raw position.
+  // A team at position 2 (2nd) can fall to 3rd; a team at 4th can rise to 3rd.
+  // We check positions 2-4 (0-indexed: indices 1-3).
   function thirdCandidates(letters) {
     const thirds = [];
     for (const l of letters) {
@@ -1192,23 +1192,34 @@ function renderBracket() {
       if (grp.length < 3) continue;
       const groupDone = grp.every(e => e.gp === 3);
       const current3rd = grp[2];
-      const current4th = grp[3];
 
       if (groupDone) {
-        // Group is over — only the actual 3rd-place team matters
+        // Only the actual 3rd-place team matters once the group is over.
         if (current3rd && !committedTeams.has(current3rd.name)) {
           thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false });
         }
       } else {
-        // Group still playing — show any team at 3rd or 4th that can still finish 3rd
-        for (const team of [current3rd, current4th]) {
+        for (let i = 1; i < grp.length; i++) { // indices 1,2,3 → 2nd, 3rd, 4th
+          const team = grp[i];
           if (!team || committedTeams.has(team.name)) continue;
-          const maxPts = team.pts + (3 - team.gp) * 3;
-          // Must be able to reach at least 3rd (maxPts >= current 3rd's pts)
-          const canReach3rd = !current3rd || team === current3rd || maxPts >= current3rd.pts;
-          if (!canReach3rd) continue;
-          const secondTeam = grp[1];
-          const couldReach2nd = secondTeam && maxPts >= secondTeam.pts;
+          const teamMax = team.pts + (3 - team.gp) * 3;
+
+          if (i === 1) {
+            // Currently 2nd: only include if at least one team below can overtake them
+            // (pushing them down to 3rd). Use >= so pts ties count.
+            const canBeOvertaken = grp.slice(2).some(e =>
+              !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) >= team.pts
+            );
+            if (!canBeOvertaken) continue;
+          } else if (i === 3) {
+            // Currently 4th: only include if they can reach 3rd's current points.
+            if (!current3rd || teamMax < current3rd.pts) continue;
+          }
+          // i === 2 (currently 3rd): always a candidate.
+
+          const couldReach2nd = current3rd && i < 2
+            ? false // already above 3rd, this flag is for upward movement
+            : !!(grp[1] && teamMax >= grp[1].pts);
           thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd });
         }
       }
