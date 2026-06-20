@@ -1183,30 +1183,34 @@ function renderBracket() {
   }
 
   // Teams that may qualify as a 3rd-place finisher from the given group letters.
-  // Uses raw group position [2] (the actual 3rd-place team), not eligible[2],
-  // because committed teams (e.g. Mexico) still hold their group position —
-  // they just go to a different bracket slot.
+  // Checks positions 3 AND 4: a team currently 4th can still overtake 3rd.
+  // Committed teams (e.g. Mexico) are skipped regardless of their raw position.
   function thirdCandidates(letters) {
     const thirds = [];
     for (const l of letters) {
       const grp = byGroup[l] || [];
       if (grp.length < 3) continue;
       const groupDone = grp.every(e => e.gp === 3);
-      const thirdTeam = grp[2]; // actual current 3rd-place in this group
-      if (!thirdTeam || committedTeams.has(thirdTeam.name)) continue;
+      const current3rd = grp[2];
+      const current4th = grp[3];
 
       if (groupDone) {
-        thirds.push({ ...thirdTeam, groupLetter: l, confirmed: true, possible: false });
+        // Group is over — only the actual 3rd-place team matters
+        if (current3rd && !committedTeams.has(current3rd.name)) {
+          thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false });
+        }
       } else {
-        // Show as candidate only if they haven't been mathematically eliminated from 3rd
-        // (i.e. a team below them can't overtake them, keeping them stuck at 4th+).
-        // Always show current 3rd — they might move up OR stay at 3rd.
-        // Mark possible:false if they can't reach 2nd (clearly destined for 3rd or worse),
-        // possible:true if they still could finish 2nd (ambiguous).
-        const secondTeam = grp[1];
-        const maxPts = thirdTeam.pts + (3 - thirdTeam.gp) * 3;
-        const couldReach2nd = secondTeam && maxPts >= secondTeam.pts;
-        thirds.push({ ...thirdTeam, groupLetter: l, confirmed: false, possible: couldReach2nd });
+        // Group still playing — show any team at 3rd or 4th that can still finish 3rd
+        for (const team of [current3rd, current4th]) {
+          if (!team || committedTeams.has(team.name)) continue;
+          const maxPts = team.pts + (3 - team.gp) * 3;
+          // Must be able to reach at least 3rd (maxPts >= current 3rd's pts)
+          const canReach3rd = !current3rd || team === current3rd || maxPts >= current3rd.pts;
+          if (!canReach3rd) continue;
+          const secondTeam = grp[1];
+          const couldReach2nd = secondTeam && maxPts >= secondTeam.pts;
+          thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd });
+        }
       }
     }
     thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
