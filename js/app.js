@@ -1097,18 +1097,100 @@ function renderBracket() {
 
   const getMatch = id => byId[id] || null;
 
+  // Build group standings index: { 'A': [{pos,name,flag,gp,pts,gd,gf,...}, ...] }
+  const byGroup = {};
+  for (const g of state.standings) {
+    const letter = g.name.replace('Group ', '').trim();
+    byGroup[letter] = g.entries; // pre-sorted by pos
+  }
+
+  // Return candidates for an ESPN placeholder team name.
+  // confirmed=true means group finished and position is locked.
+  // leader=true means currently in that position but group not done.
+  function candidates(teamName) {
+    let m;
+
+    if (m = teamName.match(/^Group ([A-L]) Winner$/)) {
+      return posCandidates(byGroup[m[1]] || [], 1, 'W');
+    }
+    if (m = teamName.match(/^Group ([A-L]) 2nd Place$/)) {
+      return posCandidates(byGroup[m[1]] || [], 2, '2nd');
+    }
+    if (m = teamName.match(/^Third Place Group ([A-L/]+)$/)) {
+      const letters = m[1].split('/');
+      const thirds = letters.map(l => {
+        const e = (byGroup[l] || [])[2]; // 3rd in that group
+        return e ? { ...e, groupLetter: l } : null;
+      }).filter(Boolean);
+      thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+      const allDone = thirds.every(t => t.gp === 3);
+      return thirds.map((t, i) => ({
+        ...t,
+        label: `3rd ${t.groupLetter}`,
+        confirmed: allDone && i === 0,
+        leader: !allDone && i === 0,
+      }));
+    }
+    return null; // real team name, not a placeholder
+  }
+
+  // Teams that can still finish at targetPos (1-based) in the group
+  function posCandidates(entries, targetPos, posLabel) {
+    if (!entries.length) return [];
+    const groupDone = entries.every(e => e.gp === 3);
+    if (groupDone) {
+      const t = entries[targetPos - 1];
+      return t ? [{ ...t, label: posLabel, confirmed: true, leader: false }] : [];
+    }
+    const atPos = entries[targetPos - 1];
+    if (!atPos) return [];
+    return entries
+      .filter(e => (e.pts + (3 - e.gp) * 3) >= atPos.pts)
+      .map((e, i, arr) => ({
+        ...e,
+        label: posLabel,
+        confirmed: false,
+        leader: e === atPos,
+      }));
+  }
+
+  // Render one team row inside a slot
+  function teamRow(team, winnerClass) {
+    const cands = team?.name ? candidates(team.name) : null;
+    if (!cands) {
+      // Real (determined) team
+      const logo = team?.logo
+        ? `<img class="bk-logo" src="${team.logo}" alt="${team.name||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${team?.flag||'⚽'}</span>`
+        : `<span class="bk-flag">${team?.flag||'⚽'}</span>`;
+      return `<div class="bk-team${winnerClass ? ' '+winnerClass : ''}">
+        ${logo}<span class="bk-name">${team?.name||'TBD'}</span>
+      </div>`;
+    }
+    // Placeholder: show candidates
+    if (!cands.length) {
+      return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.name}</span></div>`;
+    }
+    const rows = cands.map(c => {
+      const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
+      const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
+      return `<div class="bk-cand ${cls}">
+        <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
+        <span class="bk-cand-name">${c.name}</span>${badge}
+      </div>`;
+    }).join('');
+    return `<div class="bk-team bk-cands">
+      <div class="bk-cand-lbl">${team.name}</div>
+      ${rows}
+    </div>`;
+  }
+
   // Render one match slot
   function slot(m, label, isFinal = false) {
-    const logoImg = (t, fallback) => t?.logo
-      ? `<img class="bk-logo" src="${t.logo}" alt="${t.name||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">`
-        + `<span class="bk-flag" style="display:none">${fallback}</span>`
-      : `<span class="bk-flag">${fallback}</span>`;
-
     if (!m) {
       return `<div class="bk-slot bk-tbd${isFinal?' bk-final-slot':''}">
-        <div class="bk-team bk-top"><span class="bk-flag">⚽</span><span class="bk-name">${label||'TBD'}</span></div>
+        <div class="bk-team"><span class="bk-flag">⚽</span><span class="bk-name">${label||'TBD'}</span></div>
         <div class="bk-divider"></div>
-        <div class="bk-team bk-bot"><span class="bk-flag">⚽</span><span class="bk-name">TBD</span></div>
+        <div class="bk-team"><span class="bk-flag">⚽</span><span class="bk-name">TBD</span></div>
       </div>`;
     }
     const isPre  = m.status === 'pre';
@@ -1119,18 +1201,25 @@ function renderBracket() {
     const badge = isLive ? `<span class="bk-live">LIVE ${m.clock||''}</span>` : (isFT ? `<span class="bk-ft">FT</span>` : `<span class="bk-date">${dateStr} ${timeStr}</span>`);
     const awayWon = isFT && m.away?.score > m.home?.score;
     const homeWon = isFT && m.home?.score > m.away?.score;
+    // For confirmed matches, add score to team row
+    const awayScore = (isFT||isLive) ? `<span class="bk-score">${m.away?.score??''}</span>` : '';
+    const homeScore = (isFT||isLive) ? `<span class="bk-score">${m.home?.score??''}</span>` : '';
+    const awayRow = (isFT||isLive||isPre) && !candidates(m.away?.name||'')
+      ? `<div class="bk-team${awayWon?' bk-winner':''}">
+          ${m.away?.logo ? `<img class="bk-logo" src="${m.away.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${m.away?.flag||'⚽'}</span>` : `<span class="bk-flag">${m.away?.flag||'⚽'}</span>`}
+          <span class="bk-name">${m.away?.name||'TBD'}</span>${awayScore}
+        </div>`
+      : teamRow(m.away, awayWon ? 'bk-winner' : '');
+    const homeRow = (isFT||isLive||isPre) && !candidates(m.home?.name||'')
+      ? `<div class="bk-team${homeWon?' bk-winner':''}">
+          ${m.home?.logo ? `<img class="bk-logo" src="${m.home.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${m.home?.flag||'⚽'}</span>` : `<span class="bk-flag">${m.home?.flag||'⚽'}</span>`}
+          <span class="bk-name">${m.home?.name||'TBD'}</span>${homeScore}
+        </div>`
+      : teamRow(m.home, homeWon ? 'bk-winner' : '');
     return `<div class="bk-slot${isFinal?' bk-final-slot':''}${isLive?' bk-slot-live':''}" onclick="showMatchDetail('${m.id}')" style="cursor:pointer">
-      <div class="bk-team bk-top${awayWon?' bk-winner':''}">
-        ${logoImg(m.away, m.away?.flag||'⚽')}
-        <span class="bk-name">${m.away?.name||'TBD'}</span>
-        ${isFT||isLive ? `<span class="bk-score">${m.away?.score??''}</span>` : ''}
-      </div>
+      ${awayRow}
       <div class="bk-divider">${badge}</div>
-      <div class="bk-team bk-bot${homeWon?' bk-winner':''}">
-        ${logoImg(m.home, m.home?.flag||'⚽')}
-        <span class="bk-name">${m.home?.name||'TBD'}</span>
-        ${isFT||isLive ? `<span class="bk-score">${m.home?.score??''}</span>` : ''}
-      </div>
+      ${homeRow}
     </div>`;
   }
 

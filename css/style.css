@@ -669,6 +669,17 @@ footer span { color:var(--gold); }
 .bk-divider > * { background: var(--card); padding: 0 4px; position: relative; z-index: 1; white-space: nowrap; }
 .bk-tbd .bk-team { color: var(--text-dim); }
 
+/* Candidate teams in undetermined bracket slots */
+.bk-cands { flex-direction: column; align-items: flex-start; gap: 1px; padding: 4px 7px; min-height: 28px; }
+.bk-cand-lbl { font-size: 0.58rem; color: var(--text-dim); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.bk-cand { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; width: 100%; }
+.bk-cand-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-cand-sure { color: var(--gold); font-weight: 700; }
+.bk-cand-lead { color: var(--text); font-weight: 600; }
+.bk-cand-maybe { color: var(--text-dim); }
+.bk-tick { font-size: 0.6rem; flex-shrink: 0; color: var(--gold); }
+.bk-tick-lead { color: var(--text-dim); }
+
 .bk-live { background: #e84040; color: #fff; border-radius: 3px; padding: 1px 4px; font-size: 0.58rem; font-weight: 700; }
 .bk-ft   { color: var(--text-dim); font-size: 0.6rem; }
 .bk-date { color: var(--text-dim); font-size: 0.58rem; }
