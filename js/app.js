@@ -1160,22 +1160,25 @@ function renderBracket() {
     }
 
     // Group not done.
-    // "Current holder" = the team at raw position targetPos in standings.
-    // If that team is committed, slide down to the next non-committed team.
-    let currentHolder = null;
-    for (let i = targetPos - 1; i < entries.length; i++) {
-      if (!committedTeams.has(entries[i].name)) { currentHolder = entries[i]; break; }
-    }
+    // Threshold = pts of whoever sits at raw position targetPos in standings.
+    // This is the bar to beat for this slot, regardless of whether that team
+    // is committed elsewhere (e.g. Mexico at 2nd place with 6pts — a non-committed
+    // team still needs to reach 6pts to credibly fill that slot).
+    const rawAtPos = entries[targetPos - 1];
+    const threshold = rawAtPos?.pts ?? 0;
 
-    // Candidates must be able to reach at least currentHolder's current pts.
-    const threshold = currentHolder?.pts ?? 0;
+    // Leader = the team currently at raw targetPos if they are eligible,
+    // else the best eligible team (Mexico is committed but whoever leads
+    // the remaining teams is effectively next in line for this slot).
+    const rawIsEligible = rawAtPos && !committedTeams.has(rawAtPos.name);
+    const leaderName = (rawIsEligible ? rawAtPos : eligible[0])?.name ?? '';
 
     return eligible
       .filter(e => (e.pts + (3 - e.gp) * 3) >= threshold)
       .map(e => ({
         ...e,
         confirmed: false,
-        leader: e.name === currentHolder?.name,
+        leader: e.name === leaderName,
       }));
   }
 
