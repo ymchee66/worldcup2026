@@ -652,6 +652,7 @@ footer span { color:var(--gold); }
 }
 .bk-winner { color: var(--gold); font-weight: 700; }
 .bk-flag { font-size: 0.95rem; flex-shrink: 0; }
+.bk-logo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 .bk-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bk-score { font-weight: 700; font-size: 0.78rem; color: var(--text); margin-left: 3px; }
 .bk-winner .bk-score { color: var(--gold); }

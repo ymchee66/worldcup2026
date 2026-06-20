@@ -120,6 +120,7 @@ function parseEvent(ev) {
       name:  home.team?.shortDisplayName || home.team?.displayName || '',
       score: home.score ?? null,
       flag:  teamFlag(home.team?.abbreviation, home.team?.displayName),
+      logo:  home.team?.id ? `https://a.espncdn.com/i/teamlogos/soccer/500/${home.team.id}.png` : '',
     },
     away: {
       id:    away.team?.id || '',
@@ -127,6 +128,7 @@ function parseEvent(ev) {
       name:  away.team?.shortDisplayName || away.team?.displayName || '',
       score: away.score ?? null,
       flag:  teamFlag(away.team?.abbreviation, away.team?.displayName),
+      logo:  away.team?.id ? `https://a.espncdn.com/i/teamlogos/soccer/500/${away.team.id}.png` : '',
     },
     venue:     comp.venue?.fullName || '',
     broadcast: comp.broadcasts?.[0]?.names?.[0] || '',

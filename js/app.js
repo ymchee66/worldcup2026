@@ -1099,6 +1099,11 @@ function renderBracket() {
 
   // Render one match slot
   function slot(m, label, isFinal = false) {
+    const logoImg = (t, fallback) => t?.logo
+      ? `<img class="bk-logo" src="${t.logo}" alt="${t.name||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">`
+        + `<span class="bk-flag" style="display:none">${fallback}</span>`
+      : `<span class="bk-flag">${fallback}</span>`;
+
     if (!m) {
       return `<div class="bk-slot bk-tbd${isFinal?' bk-final-slot':''}">
         <div class="bk-team bk-top"><span class="bk-flag">⚽</span><span class="bk-name">${label||'TBD'}</span></div>
@@ -1111,19 +1116,18 @@ function renderBracket() {
     const isFT   = m.status === 'post';
     const dateStr = new Date(m.date).toLocaleDateString([], { month:'short', day:'numeric' });
     const timeStr = new Date(m.date).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-    const score = (isFT||isLive) && m.away?.score!=null ? `${m.away.score}–${m.home.score}` : (isPre ? dateStr : '');
     const badge = isLive ? `<span class="bk-live">LIVE ${m.clock||''}</span>` : (isFT ? `<span class="bk-ft">FT</span>` : `<span class="bk-date">${dateStr} ${timeStr}</span>`);
     const awayWon = isFT && m.away?.score > m.home?.score;
     const homeWon = isFT && m.home?.score > m.away?.score;
     return `<div class="bk-slot${isFinal?' bk-final-slot':''}${isLive?' bk-slot-live':''}" onclick="showMatchDetail('${m.id}')" style="cursor:pointer">
       <div class="bk-team bk-top${awayWon?' bk-winner':''}">
-        <span class="bk-flag">${m.away?.flag||'⚽'}</span>
+        ${logoImg(m.away, m.away?.flag||'⚽')}
         <span class="bk-name">${m.away?.name||'TBD'}</span>
         ${isFT||isLive ? `<span class="bk-score">${m.away?.score??''}</span>` : ''}
       </div>
       <div class="bk-divider">${badge}</div>
       <div class="bk-team bk-bot${homeWon?' bk-winner':''}">
-        <span class="bk-flag">${m.home?.flag||'⚽'}</span>
+        ${logoImg(m.home, m.home?.flag||'⚽')}
         <span class="bk-name">${m.home?.name||'TBD'}</span>
         ${isFT||isLive ? `<span class="bk-score">${m.home?.score??''}</span>` : ''}
       </div>
