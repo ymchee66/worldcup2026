@@ -590,6 +590,95 @@ footer span { color:var(--gold); }
 .pd-lbl { color:var(--text-dim);width:90px;flex-shrink:0; }
 .pd-val { color:var(--text);font-weight:500; }
 
+/* ── Knockout Bracket ───────────────────────────────────────────── */
+.bk-scroll { overflow-x: auto; overflow-y: visible; padding: 1rem 0.5rem 2rem; -webkit-overflow-scrolling: touch; }
+.bk-root { display: inline-flex; align-items: center; min-width: max-content; }
+
+/* A bracket node = pair of feeders + connecting arm + this match */
+.bk-node { display: flex; align-items: center; }
+
+/* A pair = two feeder nodes stacked, with right bracket arm */
+.bk-pair {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+/* Right-side bracket arm: vertical line + horizontal nub */
+.bk-pair::after {
+  content: '';
+  position: absolute;
+  right: -14px;
+  top: calc(50% - 0px);
+  width: 14px;
+  height: 1px;
+  background: var(--border);
+}
+.bk-pair::before {
+  content: '';
+  position: absolute;
+  right: -14px;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: var(--border);
+}
+
+/* Arm = horizontal line from pair to match slot */
+.bk-arm { width: 14px; height: 1px; background: var(--border); flex-shrink: 0; }
+
+/* Match slot */
+.bk-slot {
+  width: 148px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--card);
+  margin: 4px 0;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+.bk-slot:hover { border-color: var(--gold); }
+.bk-slot-live { border-color: #e84040 !important; }
+.bk-final-slot { width: 170px; border-color: var(--gold); }
+
+.bk-team {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  min-height: 26px;
+}
+.bk-winner { color: var(--gold); font-weight: 700; }
+.bk-flag { font-size: 0.95rem; flex-shrink: 0; }
+.bk-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-score { font-weight: 700; font-size: 0.78rem; color: var(--text); margin-left: 3px; }
+.bk-winner .bk-score { color: var(--gold); }
+.bk-divider {
+  height: 1px;
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  position: relative;
+}
+.bk-divider > * { background: var(--card); padding: 0 4px; position: relative; z-index: 1; white-space: nowrap; }
+.bk-tbd .bk-team { color: var(--text-dim); }
+
+.bk-live { background: #e84040; color: #fff; border-radius: 3px; padding: 1px 4px; font-size: 0.58rem; font-weight: 700; }
+.bk-ft   { color: var(--text-dim); font-size: 0.6rem; }
+.bk-date { color: var(--text-dim); font-size: 0.58rem; }
+
+.bk-legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 0.75rem; color: var(--text-dim); align-items: center; }
+.bk-legend-item { display: flex; align-items: center; gap: 0.35rem; }
+.bk-winner-eg { color: var(--gold); }
+
+.bk-third { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.bk-third .bk-slot { width: 200px; }
+
 /* ── Gallery ─────────────────────────────────────────────────────── */
 .gallery-grid {
   display: grid;

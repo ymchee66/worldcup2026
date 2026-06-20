@@ -1047,23 +1047,145 @@ function initMap() {
 }
 
 // ── Bracket ───────────────────────────────────────────────────────────────
+// ── Knockout Bracket ─────────────────────────────────────────────────────────
+// ESPN event ID mapping for the 2026 WC knockout rounds
+const BRACKET_IDS = {
+  r32:  ['760486','760487','760488','760489','760490','760491','760492','760493',
+          '760494','760495','760496','760497','760498','760499','760500','760501'],
+  r16:  ['760502','760503','760504','760505','760507','760506','760508','760509'],
+  qf:   ['760510','760511','760512','760513'],
+  sf:   ['760514','760515'],
+  third:'760516',
+  final:'760517',
+};
+
+// Bracket tree — each node = { matchIdx, top, bottom }
+// matchIdx references position in the respective round array
+// Feeds left side → SF1, right side → SF2
+const BRACKET_TREE = {
+  // left half (feeds SF1 = sf[0])
+  sf0: {
+    qf0: {
+      r16_0: { top: 0, bot: 2 },   // M1(760486) vs M3(760488) → R16[0]
+      r16_1: { top: 1, bot: 4 },   // M2(760487) vs M5(760490) → R16[1]
+    },
+    qf1: {
+      r16_4: { top: 8, bot: 9 },   // M9(760494) vs M10(760495) → R16[4]
+      r16_5: { top: 10, bot: 11 }, // M11(760496) vs M12(760497) → R16[5]
+    },
+  },
+  // right half (feeds SF2 = sf[1])
+  sf1: {
+    qf2: {
+      r16_2: { top: 3, bot: 5 },   // M4(760489) vs M6(760491) → R16[2]
+      r16_3: { top: 6, bot: 7 },   // M7(760492) vs M8(760493) → R16[3]
+    },
+    qf3: {
+      r16_6: { top: 12, bot: 14 }, // M13(760498) vs M15(760500) → R16[6]
+      r16_7: { top: 13, bot: 15 }, // M14(760499) vs M16(760501) → R16[7]
+    },
+  },
+};
+
 function renderBracket() {
   const el = $('bracket-container');
   if (!el) return;
-  const rounds = [
-    { name:'Group Stage',    desc:'12 Groups of 4 · 72 matches', teams:48, icon:'🔵' },
-    { name:'Round of 32',    desc:'24 group winners + 8 best 3rd-place', teams:32, icon:'🟡' },
-    { name:'Round of 16',    desc:'16 teams remain', teams:16, icon:'🟠' },
-    { name:'Quarterfinals',  desc:'8 nations chase glory', teams:8, icon:'🔴' },
-    { name:'Semifinals',     desc:'Final four', teams:4, icon:'🟣' },
-    { name:'3rd Place',      desc:'MetLife · Jul 19', teams:2, icon:'🥉' },
-    { name:'Final',          desc:'MetLife · Jul 19, 2026', teams:2, icon:'🏆' },
-  ];
-  el.innerHTML = `<div class="bracket-flow">${rounds.map((r,i) => `
-    <div class="bracket-round"><div class="bracket-round-icon">${r.icon}</div><div class="bracket-round-name">${r.name}</div><div class="bracket-round-teams">${r.teams}</div><div class="bracket-round-desc">${r.desc}</div></div>
-    ${i < rounds.length-1 ? '<div class="bracket-arrow">→</div>' : ''}`).join('')}
-  </div>
-  <div class="bracket-note"><strong>2026 Format:</strong> First-ever 48-team World Cup. New Round of 32 before the traditional knockout stages. 104 total matches across 16 venues in USA, Canada and Mexico.</div>`;
+
+  // Look up a match from state.schedule by ESPN event ID
+  const byId = {};
+  for (const m of state.schedule) byId[m.id] = m;
+
+  const getMatch = id => byId[id] || null;
+
+  // Render one match slot
+  function slot(m, label, isFinal = false) {
+    if (!m) {
+      return `<div class="bk-slot bk-tbd${isFinal?' bk-final-slot':''}">
+        <div class="bk-team bk-top"><span class="bk-flag">⚽</span><span class="bk-name">${label||'TBD'}</span></div>
+        <div class="bk-divider"></div>
+        <div class="bk-team bk-bot"><span class="bk-flag">⚽</span><span class="bk-name">TBD</span></div>
+      </div>`;
+    }
+    const isPre  = m.status === 'pre';
+    const isLive = m.status === 'in';
+    const isFT   = m.status === 'post';
+    const dateStr = new Date(m.date).toLocaleDateString([], { month:'short', day:'numeric' });
+    const timeStr = new Date(m.date).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    const score = (isFT||isLive) && m.away?.score!=null ? `${m.away.score}–${m.home.score}` : (isPre ? dateStr : '');
+    const badge = isLive ? `<span class="bk-live">LIVE ${m.clock||''}</span>` : (isFT ? `<span class="bk-ft">FT</span>` : `<span class="bk-date">${dateStr} ${timeStr}</span>`);
+    const awayWon = isFT && m.away?.score > m.home?.score;
+    const homeWon = isFT && m.home?.score > m.away?.score;
+    return `<div class="bk-slot${isFinal?' bk-final-slot':''}${isLive?' bk-slot-live':''}" onclick="showMatchDetail('${m.id}')" style="cursor:pointer">
+      <div class="bk-team bk-top${awayWon?' bk-winner':''}">
+        <span class="bk-flag">${m.away?.flag||'⚽'}</span>
+        <span class="bk-name">${m.away?.name||'TBD'}</span>
+        ${isFT||isLive ? `<span class="bk-score">${m.away?.score??''}</span>` : ''}
+      </div>
+      <div class="bk-divider">${badge}</div>
+      <div class="bk-team bk-bot${homeWon?' bk-winner':''}">
+        <span class="bk-flag">${m.home?.flag||'⚽'}</span>
+        <span class="bk-name">${m.home?.name||'TBD'}</span>
+        ${isFT||isLive ? `<span class="bk-score">${m.home?.score??''}</span>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Pair two slots with connector lines
+  function pair(topSlot, botSlot) {
+    return `<div class="bk-pair">${topSlot}${botSlot}</div>`;
+  }
+
+  // Wrap a pair + its resulting match into a bracket node
+  function node(pairHtml, matchSlot) {
+    return `<div class="bk-node">${pairHtml}<div class="bk-arm"></div>${matchSlot}</div>`;
+  }
+
+  // Build left half (top-down: QF0, QF1 → SF1)
+  const r32 = BRACKET_IDS.r32.map(id => getMatch(id));
+  const r16  = BRACKET_IDS.r16.map(id => getMatch(id));
+  const qf   = BRACKET_IDS.qf.map(id => getMatch(id));
+  const sf   = BRACKET_IDS.sf.map(id => getMatch(id));
+  const fin  = getMatch(BRACKET_IDS.final);
+  const trd  = getMatch(BRACKET_IDS.third);
+
+  // Left side
+  const L_r16_0 = node(pair(slot(r32[0],'1A/2A'), slot(r32[2],'1C/2C')), slot(r16[0],'R16'));
+  const L_r16_1 = node(pair(slot(r32[1],'1B/2B'), slot(r32[4],'1E/2E')), slot(r16[1],'R16'));
+  const L_qf0   = node(pair(L_r16_0, L_r16_1), slot(qf[0],'QF'));
+
+  const L_r16_4 = node(pair(slot(r32[8],'1D/3rd'), slot(r32[9],'1L/3rd')), slot(r16[4],'R16'));
+  const L_r16_5 = node(pair(slot(r32[10],'2K/2L'), slot(r32[11],'1H/2J')), slot(r16[5],'R16'));
+  const L_qf1   = node(pair(L_r16_4, L_r16_5), slot(qf[1],'QF'));
+
+  const L_sf = node(pair(L_qf0, L_qf1), slot(sf[0],'SF'));
+
+  // Right side (mirrored)
+  const R_r16_2 = node(pair(slot(r32[3],'3rd/1E'), slot(r32[5],'MEX/3rd')), slot(r16[2],'R16'));
+  const R_r16_3 = node(pair(slot(r32[6],'3rd/1I'), slot(r32[7],'1G/3rd')), slot(r16[3],'R16'));
+  const R_qf2   = node(pair(R_r16_2, R_r16_3), slot(qf[2],'QF'));
+
+  const R_r16_6 = node(pair(slot(r32[12],'1B/3rd'), slot(r32[14],'1J/2H')), slot(r16[6],'R16'));
+  const R_r16_7 = node(pair(slot(r32[13],'2D/2G'), slot(r32[15],'1K/3rd')), slot(r16[7],'R16'));
+  const R_qf3   = node(pair(R_r16_6, R_r16_7), slot(qf[3],'QF'));
+
+  const R_sf = node(pair(R_qf2, R_qf3), slot(sf[1],'SF'));
+
+  // Final
+  const finalNode = node(pair(L_sf, R_sf), slot(fin,'Final',true));
+
+  el.innerHTML = `
+    <div class="bk-legend">
+      <span class="bk-legend-item"><span class="bk-live">LIVE</span> Live match</span>
+      <span class="bk-legend-item"><span class="bk-ft">FT</span> Completed</span>
+      <span class="bk-legend-item bk-winner-eg">🏅 Winner highlighted</span>
+    </div>
+    <div class="bk-scroll">
+      <div class="bk-root">${finalNode}</div>
+    </div>
+    <div class="bk-third">
+      <div class="scores-section-label" style="margin-bottom:0.5rem">🥉 Third Place Playoff · Hard Rock Stadium · Jul 18</div>
+      ${slot(trd,'3rd Place')}
+    </div>`;
 }
 
 // ── News ──────────────────────────────────────────────────────────────────
@@ -1160,6 +1282,7 @@ window.showSection = function(name) {
   window.updateBottomNav(name);
   window.scrollTo({ top:0, behavior:'smooth' });
   if (name === 'map') setTimeout(initMap, 100);
+  if (name === 'bracket') renderBracket();
   if (name === 'stats') renderStats();
   if (name === 'gallery') renderGallery();
 };
@@ -1236,7 +1359,7 @@ async function init() {
 
   fetchSchedule().then(schedule => {
     state.schedule = schedule;
-    renderSchedule(); renderTeams();
+    renderSchedule(); renderTeams(); renderBracket();
     if (state.activeSection === 'stats') renderStats();
     fetchLiveTournamentStats();
   });
