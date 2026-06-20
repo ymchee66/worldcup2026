@@ -1120,54 +1120,98 @@ function renderBracket() {
 
   // Return candidates for an ESPN placeholder team displayName.
   // confirmed=true means group finished and position is locked.
-  // leader=true means currently in that position but group not done.
+  // leader=true means currently holds that position (group not done).
   function candidates(displayName) {
     if (!displayName || !isPlaceholder(displayName)) return null;
     let m;
 
     if (m = displayName.match(/^Group ([A-L]) Winner$/i)) {
-      return posCandidates(byGroup[m[1]] || [], 1, 'Winner');
+      return posCandidates(byGroup[m[1]] || [], 1);
     }
     if (m = displayName.match(/^Group ([A-L]) 2nd Place$/i)) {
-      return posCandidates(byGroup[m[1]] || [], 2, '2nd Place');
+      return posCandidates(byGroup[m[1]] || [], 2);
     }
     if (m = displayName.match(/Third Place Group ([A-L/]+)/i)) {
-      const letters = m[1].split('/');
-      const thirds = letters.map(l => {
-        const e = (byGroup[l] || [])[2]; // current 3rd in that group
-        // Skip if this team is committed to another slot
-        return (e && !committedTeams.has(e.name)) ? { ...e, groupLetter: l } : null;
-      }).filter(Boolean);
-      thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-      const allDone = thirds.every(t => t.gp === 3);
-      return thirds.map((t, i) => ({
-        ...t,
-        label: `3rd ${t.groupLetter}`,
-        confirmed: allDone && i === 0,
-        leader: !allDone && i === 0,
-      }));
+      return thirdCandidates(m[1].split('/'));
     }
     return null;
   }
 
-  // Teams that can still finish at targetPos (1-based) in the group
-  function posCandidates(entries, targetPos, posLabel) {
+  // Teams that can still finish at targetPos (1-based) in the group,
+  // excluding teams already committed to specific R32 slots.
+  function posCandidates(entries, targetPos) {
     if (!entries.length) return [];
+
+    const eligible = entries.filter(e => !committedTeams.has(e.name));
+    if (!eligible.length) return [];
+
     const groupDone = entries.every(e => e.gp === 3);
+
     if (groupDone) {
-      const t = entries[targetPos - 1];
-      return t ? [{ ...t, label: posLabel, confirmed: true, leader: false }] : [];
+      // Take the team at raw position targetPos. If they're committed, take the
+      // next non-committed team (edge case: shouldn't normally happen in WC format).
+      const rawHolder = entries[targetPos - 1];
+      if (!rawHolder) return [];
+      if (!committedTeams.has(rawHolder.name)) {
+        return [{ ...rawHolder, confirmed: true, leader: false }];
+      }
+      const next = entries.slice(targetPos).find(e => !committedTeams.has(e.name));
+      return next ? [{ ...next, confirmed: true, leader: false }] : [];
     }
-    const atPos = entries[targetPos - 1];
-    if (!atPos) return [];
-    return entries
-      .filter(e => !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) >= atPos.pts)
+
+    // Group not done.
+    // "Current holder" = the team at raw position targetPos in standings.
+    // If that team is committed, slide down to the next non-committed team.
+    let currentHolder = null;
+    for (let i = targetPos - 1; i < entries.length; i++) {
+      if (!committedTeams.has(entries[i].name)) { currentHolder = entries[i]; break; }
+    }
+
+    // Candidates must be able to reach at least currentHolder's current pts.
+    const threshold = currentHolder?.pts ?? 0;
+
+    return eligible
+      .filter(e => (e.pts + (3 - e.gp) * 3) >= threshold)
       .map(e => ({
         ...e,
-        label: posLabel,
         confirmed: false,
-        leader: e === atPos,
+        leader: e.name === currentHolder?.name,
       }));
+  }
+
+  // Teams that may qualify as a 3rd-place finisher from the given group letters.
+  // Uses raw group position [2] (the actual 3rd-place team), not eligible[2],
+  // because committed teams (e.g. Mexico) still hold their group position —
+  // they just go to a different bracket slot.
+  function thirdCandidates(letters) {
+    const thirds = [];
+    for (const l of letters) {
+      const grp = byGroup[l] || [];
+      if (grp.length < 3) continue;
+      const groupDone = grp.every(e => e.gp === 3);
+      const thirdTeam = grp[2]; // actual current 3rd-place in this group
+      if (!thirdTeam || committedTeams.has(thirdTeam.name)) continue;
+
+      if (groupDone) {
+        thirds.push({ ...thirdTeam, groupLetter: l, confirmed: true, possible: false });
+      } else {
+        // Show as candidate only if they haven't been mathematically eliminated from 3rd
+        // (i.e. a team below them can't overtake them, keeping them stuck at 4th+).
+        // Always show current 3rd — they might move up OR stay at 3rd.
+        // Mark possible:false if they can't reach 2nd (clearly destined for 3rd or worse),
+        // possible:true if they still could finish 2nd (ambiguous).
+        const secondTeam = grp[1];
+        const maxPts = thirdTeam.pts + (3 - thirdTeam.gp) * 3;
+        const couldReach2nd = secondTeam && maxPts >= secondTeam.pts;
+        thirds.push({ ...thirdTeam, groupLetter: l, confirmed: false, possible: couldReach2nd });
+      }
+    }
+    thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    const allConfirmed = thirds.length > 0 && thirds.every(t => t.confirmed);
+    return thirds.map((t, i) => ({
+      ...t,
+      leader: !allConfirmed && i === 0,
+    }));
   }
 
   // Render one team row inside a slot
