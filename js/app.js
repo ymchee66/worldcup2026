@@ -1104,11 +1104,25 @@ function renderBracket() {
     byGroup[letter] = g.entries; // pre-sorted by pos
   }
 
+  // Detect placeholder displayNames like "Group A Winner", "Third Place Group A/B/C"
+  const PLACEHOLDER_RE = /^(Group [A-L] (Winner|2nd Place)|Third Place Group [A-L/]+)$/i;
+  const isPlaceholder = dn => PLACEHOLDER_RE.test(dn);
+
+  // Collect teams already committed to a specific R32 slot (e.g. Mexico in 760491).
+  // These must never appear as candidates in any other slot.
+  const committedTeams = new Set();
+  for (const id of BRACKET_IDS.r32) {
+    const m = getMatch(id);
+    if (!m) continue;
+    if (m.home?.displayName && !isPlaceholder(m.home.displayName)) committedTeams.add(m.home.name);
+    if (m.away?.displayName && !isPlaceholder(m.away.displayName)) committedTeams.add(m.away.name);
+  }
+
   // Return candidates for an ESPN placeholder team displayName.
   // confirmed=true means group finished and position is locked.
   // leader=true means currently in that position but group not done.
   function candidates(displayName) {
-    if (!displayName) return null;
+    if (!displayName || !isPlaceholder(displayName)) return null;
     let m;
 
     if (m = displayName.match(/^Group ([A-L]) Winner$/i)) {
@@ -1120,8 +1134,9 @@ function renderBracket() {
     if (m = displayName.match(/Third Place Group ([A-L/]+)/i)) {
       const letters = m[1].split('/');
       const thirds = letters.map(l => {
-        const e = (byGroup[l] || [])[2]; // 3rd in that group
-        return e ? { ...e, groupLetter: l } : null;
+        const e = (byGroup[l] || [])[2]; // current 3rd in that group
+        // Skip if this team is committed to another slot
+        return (e && !committedTeams.has(e.name)) ? { ...e, groupLetter: l } : null;
       }).filter(Boolean);
       thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
       const allDone = thirds.every(t => t.gp === 3);
@@ -1132,7 +1147,7 @@ function renderBracket() {
         leader: !allDone && i === 0,
       }));
     }
-    return null; // real team name, not a placeholder
+    return null;
   }
 
   // Teams that can still finish at targetPos (1-based) in the group
@@ -1146,8 +1161,8 @@ function renderBracket() {
     const atPos = entries[targetPos - 1];
     if (!atPos) return [];
     return entries
-      .filter(e => (e.pts + (3 - e.gp) * 3) >= atPos.pts)
-      .map((e, i, arr) => ({
+      .filter(e => !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) >= atPos.pts)
+      .map(e => ({
         ...e,
         label: posLabel,
         confirmed: false,
