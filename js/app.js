@@ -1270,7 +1270,8 @@ function renderBracket() {
 
     const result = eligible
       .filter(e => (e.pts + (3 - e.gp) * 3) >= threshold)
-      .map(e => ({ ...e, confirmed: false, leader: false, prob: groupProbs[groupLetter]?.[e.name]?.[targetPos - 1] ?? null }));
+      .map(e => ({ ...e, confirmed: false, leader: false, prob: groupProbs[groupLetter]?.[e.name]?.[targetPos - 1] ?? null }))
+      .filter(e => e.prob === null || e.prob > 0);
 
     // Sort by predicted proximity to targetPos: team predicted closest to this
     // position (by 0-based index) is most likely to occupy the slot.
@@ -1335,7 +1336,9 @@ function renderBracket() {
           const couldReach2nd = current3rd && i < 2
             ? false // already above 3rd, this flag is for upward movement
             : !!(grp[1] && teamMax >= grp[1].pts);
-          thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd, prob: groupProbs[l]?.[team.name]?.[2] ?? null });
+          const p3 = groupProbs[l]?.[team.name]?.[2] ?? null;
+          if (p3 !== null && p3 === 0) continue;
+          thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd, prob: p3 });
         }
       }
     }
