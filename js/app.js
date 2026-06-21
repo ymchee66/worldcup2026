@@ -231,8 +231,11 @@ function matchCardHTML(m, clickable = true) {
 // ── Render: Scores ────────────────────────────────────────────────────────
 function renderScores() {
   const el = $('scores-container');
+  const ymd = d => { const y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dy=String(d.getDate()).padStart(2,'0'); return `${y}${mo}${dy}`; };
+  const todayStr = ymd(new Date());
+  const isToday = m => ymd(new Date(m.date)) === todayStr;
   const live  = state.matches.filter(m => m.status === 'in' || likelyLive(m));
-  const other = state.matches.filter(m => m.status !== 'in' && !likelyLive(m));
+  const other = state.matches.filter(m => m.status !== 'in' && !likelyLive(m) && isToday(m));
   if (!state.matches.length) {
     el.innerHTML = `<div class="bracket-placeholder"><span style="font-size:2rem">⚽</span><span>No matches today — check the Schedule tab for upcoming fixtures.</span></div>`;
     return;
