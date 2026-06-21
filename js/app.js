@@ -1304,7 +1304,7 @@ function renderBracket() {
       if (groupDone) {
         // Only the actual 3rd-place team matters once the group is over.
         if (current3rd && !committedTeams.has(current3rd.name)) {
-          thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false, prob: null });
+          thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false, prob: 1 });
         }
       } else {
         for (let i = 0; i < grp.length; i++) { // all positions
