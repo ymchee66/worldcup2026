@@ -8,7 +8,8 @@ const state = {
   activeSection: 'scores', selectedMatch: null, newsExpanded: new Set(),
   teamIdMap: {}, // abbr → ESPN team ID
   predictionCache: {}, // eventId → prediction text
-  matchOdds: {}, // eventId → {home, draw, away} probabilities (0-100)
+  matchOdds: {},   // eventId → {home, draw, away} probabilities (0-100)
+  groupProbs: {},  // letter → { teamName: [p1st, p2nd, p3rd, p4th] }
 };
 
 // ── Historical data ───────────────────────────────────────────────────────
@@ -1088,6 +1089,67 @@ const BRACKET_TREE = {
   },
 };
 
+// Build per-group finish-probability tables from current standings + match odds.
+// Stored in state.groupProbs so renderBracket can read without recomputing.
+function recomputeGroupProbs() {
+  // Build group index and team→group map from state.standings
+  const byGroup = {};
+  for (const g of state.standings) {
+    const letter = g.name.replace('Group ', '').trim();
+    byGroup[letter] = g.entries;
+  }
+  const teamToGroup = {};
+  for (const [letter, entries] of Object.entries(byGroup)) {
+    for (const e of entries) teamToGroup[e.name] = letter;
+  }
+
+  const toProb = ml => ml == null ? 0 : ml > 0 ? 100 / (ml + 100) : Math.abs(ml) / (Math.abs(ml) + 100);
+
+  function computeOne(letter) {
+    const entries = byGroup[letter] || [];
+    if (!entries.length) return {};
+    const unplayed = state.schedule.filter(m =>
+      m.status === 'pre' &&
+      m.round === 'Group Stage' &&
+      m.home?.name && m.away?.name &&
+      teamToGroup[m.home.name] === letter &&
+      teamToGroup[m.away.name] === letter
+    );
+    const probs = Object.fromEntries(entries.map(e => [e.name, [0, 0, 0, 0]]));
+    function enumerate(idx, snap, weight) {
+      if (idx === unplayed.length) {
+        const sorted = [...snap].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+        sorted.forEach((e, i) => { if (probs[e.name]) probs[e.name][i] += weight; });
+        return;
+      }
+      const match = unplayed[idx];
+      const odds = state.matchOdds[match.id];
+      const pH = (odds?.home ?? 33) / 100;
+      const pD = (odds?.draw ?? 33) / 100;
+      const pA = (odds?.away ?? 34) / 100;
+      for (const [result, p] of [['home', pH], ['draw', pD], ['away', pA]]) {
+        if (p <= 0) continue;
+        const next = snap.map(e => ({ ...e }));
+        const hE = next.find(e => e.name === match.home.name);
+        const aE = next.find(e => e.name === match.away.name);
+        if (hE && aE) {
+          hE.gp++; aE.gp++;
+          if (result === 'home')       { hE.pts += 3; hE.gf++; hE.gd++; aE.ga++; aE.gd--; }
+          else if (result === 'away')  { aE.pts += 3; aE.gf++; aE.gd++; hE.ga++; hE.gd--; }
+          else                         { hE.pts++; aE.pts++; }
+        }
+        enumerate(idx + 1, next, weight * p);
+      }
+    }
+    enumerate(0, entries.map(e => ({ gf: 0, ga: 0, gd: 0, ...e })), 1);
+    return probs;
+  }
+
+  const result = {};
+  for (const letter of Object.keys(byGroup)) result[letter] = computeOne(letter);
+  state.groupProbs = result;
+}
+
 function renderBracket() {
   const el = $('bracket-container');
   if (!el) return;
@@ -1164,51 +1226,7 @@ function renderBracket() {
     return (predictedByGroup[letter] || []).findIndex(e => e.name === name);
   }
 
-  // Per-group exact enumeration of all remaining-match outcome combinations.
-  // Returns { teamName: [p1st, p2nd, p3rd, p4th] } where values are probabilities (0–1).
-  function computeGroupProbabilities(letter) {
-    const entries = byGroup[letter] || [];
-    if (!entries.length) return {};
-    const unplayed = state.schedule.filter(m =>
-      m.status === 'pre' &&
-      m.round === 'Group Stage' &&
-      m.home?.name && m.away?.name &&
-      teamToGroup[m.home.name] === letter &&
-      teamToGroup[m.away.name] === letter
-    );
-    const probs = Object.fromEntries(entries.map(e => [e.name, [0, 0, 0, 0]]));
-    function enumerate(idx, snap, weight) {
-      if (idx === unplayed.length) {
-        const sorted = [...snap].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-        sorted.forEach((e, i) => { if (probs[e.name]) probs[e.name][i] += weight; });
-        return;
-      }
-      const match = unplayed[idx];
-      const odds = state.matchOdds[match.id];
-      const pH = (odds?.home ?? 33) / 100;
-      const pD = (odds?.draw ?? 33) / 100;
-      const pA = (odds?.away ?? 34) / 100;
-      for (const [result, p] of [['home', pH], ['draw', pD], ['away', pA]]) {
-        if (p <= 0) continue;
-        const next = snap.map(e => ({ ...e }));
-        const hE = next.find(e => e.name === match.home.name);
-        const aE = next.find(e => e.name === match.away.name);
-        if (hE && aE) {
-          hE.gp++; aE.gp++;
-          if (result === 'home')       { hE.pts += 3; hE.gf++; hE.gd++; aE.ga++; aE.gd--; }
-          else if (result === 'away')  { aE.pts += 3; aE.gf++; aE.gd++; hE.ga++; hE.gd--; }
-          else                         { hE.pts++; aE.pts++; }
-        }
-        enumerate(idx + 1, next, weight * p);
-      }
-    }
-    enumerate(0, entries.map(e => ({ gf: 0, ga: 0, gd: 0, ...e })), 1);
-    return probs;
-  }
-
-  const groupProbs = Object.fromEntries(
-    Object.keys(byGroup).map(l => [l, computeGroupProbabilities(l)])
-  );
+  const groupProbs = state.groupProbs;
 
   // Detect placeholder displayNames like "Group A Winner", "Third Place Group A/B/C"
   const PLACEHOLDER_RE = /^(Group [A-L] (Winner|2nd Place)|Third Place Group [A-L/]+)$/i;
@@ -1648,6 +1666,7 @@ async function init() {
 
   fetchSchedule().then(schedule => {
     state.schedule = schedule;
+    recomputeGroupProbs();
     renderSchedule(); renderTeams(); renderBracket();
     if (state.activeSection === 'stats') renderStats();
     fetchLiveTournamentStats();
@@ -1660,6 +1679,7 @@ async function init() {
     if (unplayedGroupIds.length) {
       fetchPredictions(unplayedGroupIds).then(odds => {
         state.matchOdds = odds;
+        recomputeGroupProbs();
         if (state.activeSection === 'bracket') renderBracket();
       });
     }
