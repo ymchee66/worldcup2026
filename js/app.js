@@ -1276,12 +1276,7 @@ function renderBracket() {
 
     // Sort by predicted proximity to targetPos: team predicted closest to this
     // position (by 0-based index) is most likely to occupy the slot.
-    const targetIdx = targetPos - 1;
-    result.sort((a, b) => {
-      const aDist = Math.abs(predictedRank(a.name, groupLetter) - targetIdx);
-      const bDist = Math.abs(predictedRank(b.name, groupLetter) - targetIdx);
-      return aDist - bDist;
-    });
+    result.sort((a, b) => (b.prob ?? 0) - (a.prob ?? 0));
 
     // Leader = first team in predicted order (fallback: raw position holder)
     if (result.length) {
@@ -1345,14 +1340,7 @@ function renderBracket() {
     }
     // Sort by predicted proximity to 3rd place (index 2) within each team's group.
     // Tie-break across groups: more predicted pts = stronger 3rd-place candidate.
-    thirds.sort((a, b) => {
-      const aDist = Math.abs(predictedRank(a.name, a.groupLetter) - 2);
-      const bDist = Math.abs(predictedRank(b.name, b.groupLetter) - 2);
-      if (aDist !== bDist) return aDist - bDist;
-      const aPts = (predictedByGroup[a.groupLetter] || []).find(e => e.name === a.name)?.pts ?? a.pts;
-      const bPts = (predictedByGroup[b.groupLetter] || []).find(e => e.name === b.name)?.pts ?? b.pts;
-      return bPts - aPts;
-    });
+    thirds.sort((a, b) => (b.prob ?? 0) - (a.prob ?? 0));
     const allConfirmed = thirds.length > 0 && thirds.every(t => t.confirmed);
     return thirds.map((t, i) => ({
       ...t,
