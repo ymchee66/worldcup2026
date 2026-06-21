@@ -679,6 +679,7 @@ footer span { color:var(--gold); }
 .bk-cand-maybe { color: var(--text-dim); }
 .bk-tick { font-size: 0.6rem; flex-shrink: 0; color: var(--gold); }
 .bk-tick-lead { color: var(--text-dim); }
+.bk-prob { font-size: 0.6rem; flex-shrink: 0; color: var(--text-dim); margin-left: auto; opacity: 0.8; }
 
 .bk-live { background: #e84040; color: #fff; border-radius: 3px; padding: 1px 4px; font-size: 0.58rem; font-weight: 700; }
 .bk-ft   { color: var(--text-dim); font-size: 0.6rem; }

@@ -1164,6 +1164,51 @@ function renderBracket() {
     return (predictedByGroup[letter] || []).findIndex(e => e.name === name);
   }
 
+  // Per-group exact enumeration of all remaining-match outcome combinations.
+  // Returns { teamName: [p1st, p2nd, p3rd, p4th] } where values are probabilities (0–1).
+  function computeGroupProbabilities(letter) {
+    const entries = byGroup[letter] || [];
+    if (!entries.length) return {};
+    const unplayed = state.schedule.filter(m =>
+      m.status === 'pre' &&
+      m.home?.name && m.away?.name &&
+      teamToGroup[m.home.name] === letter &&
+      teamToGroup[m.away.name] === letter
+    );
+    const probs = Object.fromEntries(entries.map(e => [e.name, [0, 0, 0, 0]]));
+    function enumerate(idx, snap, weight) {
+      if (idx === unplayed.length) {
+        const sorted = [...snap].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+        sorted.forEach((e, i) => { if (probs[e.name]) probs[e.name][i] += weight; });
+        return;
+      }
+      const match = unplayed[idx];
+      const odds = state.matchOdds[match.id];
+      const pH = (odds?.home ?? 33) / 100;
+      const pD = (odds?.draw ?? 33) / 100;
+      const pA = (odds?.away ?? 34) / 100;
+      for (const [result, p] of [['home', pH], ['draw', pD], ['away', pA]]) {
+        if (p <= 0) continue;
+        const next = snap.map(e => ({ ...e }));
+        const hE = next.find(e => e.name === match.home.name);
+        const aE = next.find(e => e.name === match.away.name);
+        if (hE && aE) {
+          hE.gp++; aE.gp++;
+          if (result === 'home')       { hE.pts += 3; hE.gf++; hE.gd++; aE.ga++; aE.gd--; }
+          else if (result === 'away')  { aE.pts += 3; aE.gf++; aE.gd++; hE.ga++; hE.gd--; }
+          else                         { hE.pts++; aE.pts++; }
+        }
+        enumerate(idx + 1, next, weight * p);
+      }
+    }
+    enumerate(0, entries.map(e => ({ ...e })), 1);
+    return probs;
+  }
+
+  const groupProbs = Object.fromEntries(
+    Object.keys(byGroup).map(l => [l, computeGroupProbabilities(l)])
+  );
+
   // Detect placeholder displayNames like "Group A Winner", "Third Place Group A/B/C"
   const PLACEHOLDER_RE = /^(Group [A-L] (Winner|2nd Place)|Third Place Group [A-L/]+)$/i;
   const isPlaceholder = dn => PLACEHOLDER_RE.test(dn);
@@ -1225,7 +1270,7 @@ function renderBracket() {
 
     const result = eligible
       .filter(e => (e.pts + (3 - e.gp) * 3) >= threshold)
-      .map(e => ({ ...e, confirmed: false, leader: false }));
+      .map(e => ({ ...e, confirmed: false, leader: false, prob: groupProbs[groupLetter]?.[e.name]?.[targetPos - 1] ?? null }));
 
     // Sort by predicted proximity to targetPos: team predicted closest to this
     // position (by 0-based index) is most likely to occupy the slot.
@@ -1262,7 +1307,7 @@ function renderBracket() {
       if (groupDone) {
         // Only the actual 3rd-place team matters once the group is over.
         if (current3rd && !committedTeams.has(current3rd.name)) {
-          thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false });
+          thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false, prob: null });
         }
       } else {
         for (let i = 0; i < grp.length; i++) { // all positions
@@ -1290,7 +1335,7 @@ function renderBracket() {
           const couldReach2nd = current3rd && i < 2
             ? false // already above 3rd, this flag is for upward movement
             : !!(grp[1] && teamMax >= grp[1].pts);
-          thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd });
+          thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd, prob: groupProbs[l]?.[team.name]?.[2] ?? null });
         }
       }
     }
@@ -1330,9 +1375,11 @@ function renderBracket() {
     const rows = cands.map(c => {
       const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
       const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
+      const probPct = (!c.confirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
+      const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
       return `<div class="bk-cand ${cls}">
         <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
-        <span class="bk-cand-name">${c.name}</span>${badge}
+        <span class="bk-cand-name">${c.name}</span>${probStr}${badge}
       </div>`;
     }).join('');
     return `<div class="bk-team bk-cands">
