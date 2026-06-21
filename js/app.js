@@ -1207,9 +1207,12 @@ function renderBracket() {
           if (i <= 1) {
             // Currently 1st or 2nd: can fall to 3rd only if enough teams below can overtake.
             // Need (2-i) teams from below to surpass this team's current pts.
+            // Use strictly > (not >=): a team that can only match this team's pts would
+            // need H2H tiebreakers to rank above, but if they already lost to this team
+            // head-to-head they can't. Strict > is a safe conservative heuristic.
             const needed = 2 - i;
             const canOvertake = grp.slice(i + 1).filter(e =>
-              !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) >= team.pts
+              !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) > team.pts
             );
             if (canOvertake.length < needed) continue;
           } else if (i === 3) {
