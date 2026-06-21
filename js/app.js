@@ -1202,7 +1202,7 @@ function renderBracket() {
         enumerate(idx + 1, next, weight * p);
       }
     }
-    enumerate(0, entries.map(e => ({ ...e })), 1);
+    enumerate(0, entries.map(e => ({ gf: 0, ga: 0, gd: 0, ...e })), 1);
     return probs;
   }
 
