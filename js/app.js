@@ -1,5 +1,5 @@
 import { fetchScoreboard, fetchStandings, fetchNews, fetchSchedule,
-         fetchMatchSummary, fetchTeamRoster } from './api.js';
+         fetchMatchSummary, fetchTeamRoster, fetchPredictions } from './api.js';
 import { streamMatchAnalysis, streamDailyDigest, summariseArticle } from './ai.js';
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -8,6 +8,7 @@ const state = {
   activeSection: 'scores', selectedMatch: null, newsExpanded: new Set(),
   teamIdMap: {}, // abbr → ESPN team ID
   predictionCache: {}, // eventId → prediction text
+  matchOdds: {}, // eventId → {home, draw, away} probabilities (0-100)
 };
 
 // ── Historical data ───────────────────────────────────────────────────────
@@ -1104,6 +1105,65 @@ function renderBracket() {
     byGroup[letter] = g.entries; // pre-sorted by pos
   }
 
+  // Reverse map: team name → group letter (used by predictedByGroup)
+  const teamToGroup = {};
+  for (const [letter, entries] of Object.entries(byGroup)) {
+    for (const e of entries) teamToGroup[e.name] = letter;
+  }
+
+  // Predicted final standings: start from actual standings, apply pre-match
+  // predictions for every unplayed group stage match.
+  const predictedByGroup = (() => {
+    const pred = {};
+    for (const [l, entries] of Object.entries(byGroup)) {
+      pred[l] = entries.map(e => ({ ...e }));
+    }
+    for (const m of state.schedule) {
+      if (m.status !== 'pre') continue;
+      const hName = m.home?.name, aName = m.away?.name;
+      if (!hName || !aName) continue;
+      const letter = teamToGroup[hName];
+      if (!letter || teamToGroup[aName] !== letter) continue;
+      const grp = pred[letter];
+      const hE = grp.find(e => e.name === hName);
+      const aE = grp.find(e => e.name === aName);
+      if (!hE || !aE) continue;
+
+      const odds = state.matchOdds[m.id];
+      let outcome;
+      if (odds) {
+        outcome = odds.draw >= odds.home && odds.draw >= odds.away ? 'draw'
+                : odds.home >= odds.away ? 'home' : 'away';
+      } else {
+        // Fallback: pts×3 + gd as strength proxy; predict win/draw
+        const hStr = hE.pts * 3 + (hE.gd || 0);
+        const aStr = aE.pts * 3 + (aE.gd || 0);
+        outcome = hStr > aStr ? 'home' : aStr > hStr ? 'away' : 'draw';
+      }
+
+      hE.gp = (hE.gp || 0) + 1;
+      aE.gp = (aE.gp || 0) + 1;
+      if (outcome === 'home') {
+        hE.pts += 3; hE.gf = (hE.gf||0)+1; hE.gd = (hE.gd||0)+1;
+        aE.ga = (aE.ga||0)+1; aE.gd = (aE.gd||0)-1;
+      } else if (outcome === 'away') {
+        aE.pts += 3; aE.gf = (aE.gf||0)+1; aE.gd = (aE.gd||0)+1;
+        hE.ga = (hE.ga||0)+1; hE.gd = (hE.gd||0)-1;
+      } else {
+        hE.pts += 1; aE.pts += 1;
+      }
+    }
+    for (const l of Object.keys(pred)) {
+      pred[l].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    }
+    return pred;
+  })();
+
+  // 0-based index of team in predicted final standings (-1 if not found)
+  function predictedRank(name, letter) {
+    return (predictedByGroup[letter] || []).findIndex(e => e.name === name);
+  }
+
   // Detect placeholder displayNames like "Group A Winner", "Third Place Group A/B/C"
   const PLACEHOLDER_RE = /^(Group [A-L] (Winner|2nd Place)|Third Place Group [A-L/]+)$/i;
   const isPlaceholder = dn => PLACEHOLDER_RE.test(dn);
@@ -1126,10 +1186,10 @@ function renderBracket() {
     let m;
 
     if (m = displayName.match(/^Group ([A-L]) Winner$/i)) {
-      return posCandidates(byGroup[m[1]] || [], 1);
+      return posCandidates(byGroup[m[1]] || [], 1, m[1]);
     }
     if (m = displayName.match(/^Group ([A-L]) 2nd Place$/i)) {
-      return posCandidates(byGroup[m[1]] || [], 2);
+      return posCandidates(byGroup[m[1]] || [], 2, m[1]);
     }
     if (m = displayName.match(/Third Place Group ([A-L/]+)/i)) {
       return thirdCandidates(m[1].split('/'));
@@ -1139,7 +1199,9 @@ function renderBracket() {
 
   // Teams that can still finish at targetPos (1-based) in the group,
   // excluding teams already committed to specific R32 slots.
-  function posCandidates(entries, targetPos) {
+  // Results are ordered by predicted likelihood of occupying targetPos,
+  // using the predictedByGroup table built from pre-match odds.
+  function posCandidates(entries, targetPos, groupLetter) {
     if (!entries.length) return [];
 
     const eligible = entries.filter(e => !committedTeams.has(e.name));
@@ -1148,8 +1210,6 @@ function renderBracket() {
     const groupDone = entries.every(e => e.gp === 3);
 
     if (groupDone) {
-      // Take the team at raw position targetPos. If they're committed, take the
-      // next non-committed team (edge case: shouldn't normally happen in WC format).
       const rawHolder = entries[targetPos - 1];
       if (!rawHolder) return [];
       if (!committedTeams.has(rawHolder.name)) {
@@ -1159,27 +1219,33 @@ function renderBracket() {
       return next ? [{ ...next, confirmed: true, leader: false }] : [];
     }
 
-    // Group not done.
-    // Threshold = pts of whoever sits at raw position targetPos in standings.
-    // This is the bar to beat for this slot, regardless of whether that team
-    // is committed elsewhere (e.g. Mexico at 2nd place with 6pts — a non-committed
-    // team still needs to reach 6pts to credibly fill that slot).
     const rawAtPos = entries[targetPos - 1];
     const threshold = rawAtPos?.pts ?? 0;
-
-    // Leader = the team currently at raw targetPos if they are eligible,
-    // else the best eligible team (Mexico is committed but whoever leads
-    // the remaining teams is effectively next in line for this slot).
     const rawIsEligible = rawAtPos && !committedTeams.has(rawAtPos.name);
-    const leaderName = (rawIsEligible ? rawAtPos : eligible[0])?.name ?? '';
 
-    return eligible
+    const result = eligible
       .filter(e => (e.pts + (3 - e.gp) * 3) >= threshold)
-      .map(e => ({
-        ...e,
-        confirmed: false,
-        leader: e.name === leaderName,
-      }));
+      .map(e => ({ ...e, confirmed: false, leader: false }));
+
+    // Sort by predicted proximity to targetPos: team predicted closest to this
+    // position (by 0-based index) is most likely to occupy the slot.
+    const targetIdx = targetPos - 1;
+    result.sort((a, b) => {
+      const aDist = Math.abs(predictedRank(a.name, groupLetter) - targetIdx);
+      const bDist = Math.abs(predictedRank(b.name, groupLetter) - targetIdx);
+      return aDist - bDist;
+    });
+
+    // Leader = first team in predicted order (fallback: raw position holder)
+    if (result.length) {
+      result[0].leader = true;
+    } else if (rawIsEligible) {
+      // No predicted data yet — fall back to raw position holder
+      const fb = eligible.find(e => e.name === rawAtPos.name);
+      if (fb) fb.leader = true;
+    }
+
+    return result;
   }
 
   // Teams that may qualify as a 3rd-place finisher from the given group letters.
@@ -1228,7 +1294,16 @@ function renderBracket() {
         }
       }
     }
-    thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    // Sort by predicted proximity to 3rd place (index 2) within each team's group.
+    // Tie-break across groups: more predicted pts = stronger 3rd-place candidate.
+    thirds.sort((a, b) => {
+      const aDist = Math.abs(predictedRank(a.name, a.groupLetter) - 2);
+      const bDist = Math.abs(predictedRank(b.name, b.groupLetter) - 2);
+      if (aDist !== bDist) return aDist - bDist;
+      const aPts = (predictedByGroup[a.groupLetter] || []).find(e => e.name === a.name)?.pts ?? a.pts;
+      const bPts = (predictedByGroup[b.groupLetter] || []).find(e => e.name === b.name)?.pts ?? b.pts;
+      return bPts - aPts;
+    });
     const allConfirmed = thirds.length > 0 && thirds.every(t => t.confirmed);
     return thirds.map((t, i) => ({
       ...t,
@@ -1537,6 +1612,18 @@ async function init() {
     renderSchedule(); renderTeams(); renderBracket();
     if (state.activeSection === 'stats') renderStats();
     fetchLiveTournamentStats();
+
+    // Fetch pre-match odds for unplayed group stage matches to power predicted standings.
+    // Runs in background; bracket re-renders when odds arrive.
+    const unplayedGroupIds = schedule
+      .filter(m => m.status === 'pre' && m.round === 'Group Stage')
+      .map(m => m.id);
+    if (unplayedGroupIds.length) {
+      fetchPredictions(unplayedGroupIds).then(odds => {
+        state.matchOdds = odds;
+        if (state.activeSection === 'bracket') renderBracket();
+      });
+    }
   });
 
   if ($('ai-no-key-hint') && getKey()) $('ai-no-key-hint').style.display = 'none';

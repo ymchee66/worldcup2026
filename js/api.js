@@ -349,6 +349,30 @@ export async function fetchNews(limit = 12) {
 }
 
 // ── Schedule (full tournament, parallel fetch) ────────────────────────────
+// ── Match odds (pre-match H/D/A probabilities from pickcenter) ───────────────
+export async function fetchPredictions(eventIds) {
+  const results = await Promise.allSettled(
+    eventIds.map(id => fetchJSON(`${ESPN_BASE}/${WC_SLUG}/summary?event=${id}`))
+  );
+  const toProb = ml => ml == null ? 0 : ml > 0 ? 100 / (ml + 100) : Math.abs(ml) / (Math.abs(ml) + 100);
+  const out = {};
+  for (let i = 0; i < results.length; i++) {
+    if (results[i].status !== 'fulfilled') continue;
+    const pc = results[i].value.pickcenter?.[0];
+    if (!pc) continue;
+    const pH = toProb(pc.homeTeamOdds?.moneyLine);
+    const pD = toProb(pc.drawOdds?.moneyLine);
+    const pA = toProb(pc.awayTeamOdds?.moneyLine);
+    const tot = pH + pD + pA || 1;
+    out[eventIds[i]] = {
+      home: Math.round((pH / tot) * 100),
+      draw: Math.round((pD / tot) * 100),
+      away: Math.round((pA / tot) * 100),
+    };
+  }
+  return out;
+}
+
 export async function fetchSchedule() {
   const start = new Date('2026-06-11');
   const end   = new Date('2026-07-19');
