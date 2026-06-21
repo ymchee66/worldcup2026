@@ -1183,8 +1183,8 @@ function renderBracket() {
   }
 
   // Teams that may qualify as a 3rd-place finisher from the given group letters.
-  // A team at position 2 (2nd) can fall to 3rd; a team at 4th can rise to 3rd.
-  // We check positions 2-4 (0-indexed: indices 1-3).
+  // Checks all 4 positions: 1st/2nd can fall to 3rd; 4th can rise to 3rd.
+  // For 1st/2nd: need (2-i) teams below that can STRICTLY exceed their pts (not just tie).
   function thirdCandidates(letters) {
     const thirds = [];
     for (const l of letters) {
