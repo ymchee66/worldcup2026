@@ -1366,9 +1366,41 @@ function renderBracket() {
     }));
   }
 
+  // Pre-compute candidates for every R32 placeholder slot, then ensure each team
+  // is marked as leader (▶) only in the single slot where their probability is highest.
+  const candidateCache = {};
+  for (const id of BRACKET_IDS.r32) {
+    const m = getMatch(id);
+    if (!m) continue;
+    for (const side of [m.home, m.away]) {
+      const dn = side?.displayName;
+      if (!dn || !isPlaceholder(dn) || dn in candidateCache) continue;
+      candidateCache[dn] = candidates(dn) || [];
+    }
+  }
+  // Find each team's single best slot (highest prob among slots where they're leader)
+  const teamBestSlot = {};
+  for (const [dn, cands] of Object.entries(candidateCache)) {
+    for (const c of cands) {
+      if (!c.leader) continue;
+      const p = c.prob ?? 0;
+      if (!(c.name in teamBestSlot) || p > teamBestSlot[c.name].prob) {
+        teamBestSlot[c.name] = { dn, prob: p };
+      }
+    }
+  }
+  // Demote leader flag in every non-best slot
+  for (const [dn, cands] of Object.entries(candidateCache)) {
+    for (const c of cands) {
+      if (c.leader && teamBestSlot[c.name]?.dn !== dn) c.leader = false;
+    }
+  }
+
   // Render one team row inside a slot
   function teamRow(team, winnerClass) {
-    const cands = team?.displayName ? candidates(team.displayName) : null;
+    const cands = team?.displayName
+      ? (candidateCache[team.displayName] ?? candidates(team.displayName))
+      : null;
     if (!cands) {
       // Real (determined) team
       const logo = team?.logo
