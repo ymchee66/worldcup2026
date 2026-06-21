@@ -1395,6 +1395,16 @@ function renderBracket() {
       if (c.leader && teamBestSlot[c.name]?.dn !== dn) c.leader = false;
     }
   }
+  // Second pass: any slot with no leader gets the highest-prob candidate not
+  // already highlighted elsewhere.
+  const highlightedTeams = new Set(
+    Object.values(candidateCache).flatMap(cs => cs.filter(c => c.leader).map(c => c.name))
+  );
+  for (const cands of Object.values(candidateCache)) {
+    if (cands.some(c => c.leader)) continue; // already has a leader
+    const pick = cands.find(c => !c.confirmed && !highlightedTeams.has(c.name));
+    if (pick) { pick.leader = true; highlightedTeams.add(pick.name); }
+  }
 
   // Render one team row inside a slot
   function teamRow(team, winnerClass) {
