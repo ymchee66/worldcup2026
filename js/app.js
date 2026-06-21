@@ -193,9 +193,19 @@ function mlToStr(ml) {
 }
 
 // ── Match card HTML ───────────────────────────────────────────────────────
+// Returns true if a 'pre' match has passed its scheduled start and is likely underway.
+function likelyLive(m) {
+  if (m.status !== 'pre') return false;
+  const start = new Date(m.date).getTime();
+  const now = Date.now();
+  return now >= start && now - start < 3 * 60 * 60 * 1000; // within 3 hours
+}
+
 function matchCardHTML(m, clickable = true) {
-  const statusCls = m.status === 'in' ? 'status-live' : m.status === 'post' ? 'status-ft' : 'status-ns';
+  const effectively = likelyLive(m);
+  const statusCls = m.status === 'in' || effectively ? 'status-live' : m.status === 'post' ? 'status-ft' : 'status-ns';
   const statusLbl = m.status === 'in'   ? (m.clock || 'LIVE')
+                  : effectively         ? 'LIVE?'
                   : m.status === 'post' ? 'FT'
                   : matchLocalTime(m.date);
   const roundLabel = [m.round, m.group].filter(Boolean).join(' · ');
@@ -221,8 +231,8 @@ function matchCardHTML(m, clickable = true) {
 // ── Render: Scores ────────────────────────────────────────────────────────
 function renderScores() {
   const el = $('scores-container');
-  const live  = state.matches.filter(m => m.status === 'in');
-  const other = state.matches.filter(m => m.status !== 'in');
+  const live  = state.matches.filter(m => m.status === 'in' || likelyLive(m));
+  const other = state.matches.filter(m => m.status !== 'in' && !likelyLive(m));
   if (!state.matches.length) {
     el.innerHTML = `<div class="bracket-placeholder"><span style="font-size:2rem">⚽</span><span>No matches today — check the Schedule tab for upcoming fixtures.</span></div>`;
     return;
