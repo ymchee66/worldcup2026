@@ -1171,6 +1171,7 @@ function renderBracket() {
     if (!entries.length) return {};
     const unplayed = state.schedule.filter(m =>
       m.status === 'pre' &&
+      m.round === 'Group Stage' &&
       m.home?.name && m.away?.name &&
       teamToGroup[m.home.name] === letter &&
       teamToGroup[m.away.name] === letter
