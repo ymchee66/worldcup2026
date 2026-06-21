@@ -90,10 +90,35 @@ async function fetchJSON(url) {
 }
 
 // ── Scoreboard (today's matches) ──────────────────────────────────────────
+// Format a Date as YYYYMMDD in local time
+function localYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
 export async function fetchScoreboard() {
   try {
-    const d = await fetchJSON(`${ESPN_BASE}/${WC_SLUG}/scoreboard`);
-    return (d.events || []).map(ev => parseEvent(ev));
+    // Fetch today's local date plus yesterday and tomorrow to handle timezone
+    // boundary differences between ESPN's server clock and the user's local clock.
+    const now = new Date();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const tomorrow  = new Date(now); tomorrow.setDate(now.getDate() + 1);
+    const dates = [localYMD(yesterday), localYMD(now), localYMD(tomorrow)];
+    const results = await Promise.all(
+      dates.map(d => fetchJSON(`${ESPN_BASE}/${WC_SLUG}/scoreboard?dates=${d}`).catch(() => null))
+    );
+    const seen = new Set();
+    const events = [];
+    for (const r of results) {
+      for (const ev of (r?.events || [])) {
+        if (!seen.has(ev.id)) { seen.add(ev.id); events.push(parseEvent(ev)); }
+      }
+    }
+    // Sort by date ascending
+    events.sort((a, b) => new Date(a.date) - new Date(b.date));
+    return events;
   } catch (e) {
     console.warn('Scoreboard fetch failed:', e);
     return [];
