@@ -1391,31 +1391,44 @@ function renderBracket() {
       candidateCache[dn] = candidates(dn) || [];
     }
   }
-  // Find each team's single best slot (highest prob among slots where they're leader)
+  // Find each team's single best slot.
+  // Confirmed teams (group done, position locked) count as prob=1 for this purpose.
   const teamBestSlot = {};
   for (const [dn, cands] of Object.entries(candidateCache)) {
     for (const c of cands) {
-      if (!c.leader) continue;
-      const p = c.prob ?? 0;
+      const p = c.confirmed ? 1 : (c.leader ? (c.prob ?? 0) : -1);
+      if (p < 0) continue;
       if (!(c.name in teamBestSlot) || p > teamBestSlot[c.name].prob) {
         teamBestSlot[c.name] = { dn, prob: p };
       }
     }
   }
-  // Demote leader flag in every non-best slot
+  // Remove confirmed entry from every slot that is not its best slot,
+  // and demote leader flag in non-best slots.
   for (const [dn, cands] of Object.entries(candidateCache)) {
-    for (const c of cands) {
-      if (c.leader && teamBestSlot[c.name]?.dn !== dn) c.leader = false;
+    for (let i = cands.length - 1; i >= 0; i--) {
+      const c = cands[i];
+      if (teamBestSlot[c.name]?.dn !== dn) {
+        if (c.confirmed) {
+          cands.splice(i, 1); // remove from this slot entirely
+        } else if (c.leader) {
+          c.leader = false;
+        }
+      }
     }
   }
-  // Second pass: any slot with no leader gets the highest-prob candidate not
-  // already highlighted elsewhere.
+  // Confirmed teams in their best slot become the leader (they're certain).
+  for (const cands of Object.values(candidateCache)) {
+    const conf = cands.find(c => c.confirmed);
+    if (conf) conf.leader = true;
+  }
+  // Second pass: any slot with no leader gets the highest-prob non-highlighted team.
   const highlightedTeams = new Set(
     Object.values(candidateCache).flatMap(cs => cs.filter(c => c.leader).map(c => c.name))
   );
   for (const cands of Object.values(candidateCache)) {
-    if (cands.some(c => c.leader)) continue; // already has a leader
-    const pick = cands.find(c => !c.confirmed && !highlightedTeams.has(c.name));
+    if (cands.some(c => c.leader)) continue;
+    const pick = cands.find(c => !highlightedTeams.has(c.name));
     if (pick) { pick.leader = true; highlightedTeams.add(pick.name); }
   }
 
