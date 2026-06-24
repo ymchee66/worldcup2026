@@ -1715,9 +1715,12 @@ window.refresh = async function() {
 window.refreshNews = () => fetchNews(12).then(n => { state.news = n; renderNews(); });
 
 function updateHeroStats() {
-  const live = state.matches.filter(m => m.status === 'in').length;
+  const ymd = d => { const y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dy=String(d.getDate()).padStart(2,'0'); return `${y}${mo}${dy}`; };
+  const todayStr = ymd(new Date());
+  const live  = state.matches.filter(m => m.status === 'in').length;
+  const today = state.matches.filter(m => ymd(new Date(m.date)) === todayStr).length;
   $('stat-live').textContent  = live;
-  $('stat-today').textContent = state.matches.length;
+  $('stat-today').textContent = today;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────
