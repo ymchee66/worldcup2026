@@ -1258,7 +1258,7 @@ function renderBracket() {
   // Return candidates for an ESPN placeholder team displayName.
   // confirmed=true means group finished and position is locked.
   // leader=true means currently holds that position (group not done).
-  function candidates(displayName) {
+  function candidates(displayName, slotDn) {
     if (!displayName || !isPlaceholder(displayName)) return null;
     let m;
 
@@ -1269,7 +1269,7 @@ function renderBracket() {
       return posCandidates(byGroup[m[1]] || [], 2, m[1]);
     }
     if (m = displayName.match(/Third Place Group ([A-L/]+)/i)) {
-      return thirdCandidates(m[1].split('/'));
+      return thirdCandidates(m[1].split('/'), slotDn || displayName);
     }
     return null;
   }
@@ -1324,7 +1324,7 @@ function renderBracket() {
   // Teams that may qualify as a 3rd-place finisher from the given group letters.
   // Checks all 4 positions: 1st/2nd can fall to 3rd; 4th can rise to 3rd.
   // For 1st/2nd: need (2-i) teams below that can STRICTLY exceed their pts (not just tie).
-  function thirdCandidates(letters) {
+  function thirdCandidates(letters, slotDn) {
     const thirds = [];
     for (const l of letters) {
       const grp = byGroup[l] || [];
@@ -1333,7 +1333,8 @@ function renderBracket() {
       const current3rd = grp[2];
 
       if (groupDone) {
-        // Only the actual 3rd-place team matters once the group is over.
+        // Only include confirmed 3rd-place team if this slot is their assigned slot.
+        if (confirmedThirdSlot[l] !== slotDn) continue;
         if (current3rd && !committedTeams.has(current3rd.name)) {
           thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false, prob: 1 });
         }
@@ -1379,6 +1380,25 @@ function renderBracket() {
     }));
   }
 
+  // Pre-assign each confirmed 3rd-place team to exactly one bracket slot.
+  // A group's confirmed 3rd-place team goes into the first slot (by BRACKET_IDS order)
+  // whose placeholder covers that group letter. This prevents them from appearing in
+  // multiple overlapping "Third Place Group X/Y/Z" slots.
+  const confirmedThirdSlot = {}; // groupLetter -> slotDisplayName
+  for (const id of BRACKET_IDS.r32) {
+    const m = getMatch(id);
+    if (!m) continue;
+    for (const side of [m.home, m.away]) {
+      const dn = side?.displayName;
+      if (!dn) continue;
+      const tm = dn.match(/Third Place Group ([A-L/]+)/i);
+      if (!tm) continue;
+      for (const l of tm[1].split('/')) {
+        if (!confirmedThirdSlot[l]) confirmedThirdSlot[l] = dn;
+      }
+    }
+  }
+
   // Pre-compute candidates for every R32 placeholder slot, then ensure each team
   // is marked as leader (▶) only in the single slot where their probability is highest.
   const candidateCache = {};
@@ -1388,39 +1408,27 @@ function renderBracket() {
     for (const side of [m.home, m.away]) {
       const dn = side?.displayName;
       if (!dn || !isPlaceholder(dn) || dn in candidateCache) continue;
-      candidateCache[dn] = candidates(dn) || [];
+      candidateCache[dn] = candidates(dn, dn) || [];
     }
   }
-  // Find each team's single best slot.
-  // Confirmed teams (group done, position locked) count as prob=1 for this purpose.
+  // Confirmed teams are already limited to one slot (via confirmedThirdSlot).
+  // Still need to deduplicate leader (▶) across non-confirmed candidates.
   const teamBestSlot = {};
   for (const [dn, cands] of Object.entries(candidateCache)) {
     for (const c of cands) {
-      const p = c.confirmed ? 1 : (c.leader ? (c.prob ?? 0) : -1);
-      if (p < 0) continue;
+      if (!c.leader) continue;
+      const p = c.prob ?? 0;
       if (!(c.name in teamBestSlot) || p > teamBestSlot[c.name].prob) {
         teamBestSlot[c.name] = { dn, prob: p };
       }
     }
   }
-  // Remove confirmed entry from every slot that is not its best slot,
-  // and demote leader flag in non-best slots.
+  // Demote leader in every non-best slot; confirmed teams become leader in their slot.
   for (const [dn, cands] of Object.entries(candidateCache)) {
-    for (let i = cands.length - 1; i >= 0; i--) {
-      const c = cands[i];
-      if (teamBestSlot[c.name]?.dn !== dn) {
-        if (c.confirmed) {
-          cands.splice(i, 1); // remove from this slot entirely
-        } else if (c.leader) {
-          c.leader = false;
-        }
-      }
+    for (const c of cands) {
+      if (c.confirmed) { c.leader = true; continue; }
+      if (c.leader && teamBestSlot[c.name]?.dn !== dn) c.leader = false;
     }
-  }
-  // Confirmed teams in their best slot become the leader (they're certain).
-  for (const cands of Object.values(candidateCache)) {
-    const conf = cands.find(c => c.confirmed);
-    if (conf) conf.leader = true;
   }
   // Second pass: any slot with no leader gets the highest-prob non-highlighted team.
   const highlightedTeams = new Set(
