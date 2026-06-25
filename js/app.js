@@ -1333,10 +1333,13 @@ function renderBracket() {
       const current3rd = grp[2];
 
       if (groupDone) {
-        // Only include confirmed 3rd-place team if this slot is their assigned slot.
+        // Only include in this slot if it's the assigned slot for this group.
         if (confirmedThirdSlot[l] !== slotDn) continue;
+        // Group done but 3rd place is NOT truly "confirmed" for this slot — only 8 best
+        // 3rd-place teams advance, and we don't know yet which groups qualify.
+        // Show as a 100%-prob candidate (leader) but without the confirmed ✓ badge.
         if (current3rd && !committedTeams.has(current3rd.name)) {
-          thirds.push({ ...current3rd, groupLetter: l, confirmed: true, possible: false, prob: 1 });
+          thirds.push({ ...current3rd, groupLetter: l, confirmed: false, possible: false, prob: 1 });
         }
       } else {
         for (let i = 0; i < grp.length; i++) { // all positions
@@ -1446,14 +1449,13 @@ function renderBracket() {
       ? (candidateCache[team.displayName] ?? candidates(team.displayName))
       : null;
     if (!cands) {
-      // Real (determined) team
+      // Real (determined) team — shouldn't normally be called via teamRow,
+      // but fall back gracefully.
       const logo = team?.logo
         ? `<img class="bk-logo" src="${team.logo}" alt="${team.name||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${team?.flag||'⚽'}</span>`
         : `<span class="bk-flag">${team?.flag||'⚽'}</span>`;
-      return `<div class="bk-team bk-cands">
-        <div class="bk-cand bk-cand-sure">
-          ${logo}<span class="bk-cand-name">${team?.name||'TBD'}</span><span class="bk-tick">✓</span>
-        </div>
+      return `<div class="bk-team${winnerClass ? ' '+winnerClass : ''}">
+        ${logo}<span class="bk-name">${team?.name||'TBD'}</span>
       </div>`;
     }
     // Placeholder: show candidates
@@ -1461,10 +1463,9 @@ function renderBracket() {
       return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.displayName||team.name}</span></div>`;
     }
     const rows = cands.map(c => {
-      const effectivelyConfirmed = c.confirmed || (c.prob != null && Math.round(c.prob * 100) === 100);
-      const cls = effectivelyConfirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
-      const badge = effectivelyConfirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
-      const probPct = (!effectivelyConfirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
+      const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
+      const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
+      const probPct = (!c.confirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
       const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
       return `<div class="bk-cand ${cls}">
         <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
@@ -1497,17 +1498,21 @@ function renderBracket() {
     // For confirmed matches, add score to team row
     const awayScore = (isFT||isLive) ? `<span class="bk-score">${m.away?.score??''}</span>` : '';
     const homeScore = (isFT||isLive) ? `<span class="bk-score">${m.home?.score??''}</span>` : '';
+    const realTeamRow = (team, won, score) => {
+      const logo = team?.logo
+        ? `<img class="bk-logo" src="${team.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${team?.flag||'⚽'}</span>`
+        : `<span class="bk-flag">${team?.flag||'⚽'}</span>`;
+      return `<div class="bk-team bk-cands">
+        <div class="bk-cand bk-cand-sure${won?' bk-winner':''}">
+          ${logo}<span class="bk-cand-name">${team?.name||'TBD'}</span>${score}<span class="bk-tick">✓</span>
+        </div>
+      </div>`;
+    };
     const awayRow = !candidates(m.away?.displayName||'')
-      ? `<div class="bk-team${awayWon?' bk-winner':''}">
-          ${m.away?.logo ? `<img class="bk-logo" src="${m.away.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${m.away?.flag||'⚽'}</span>` : `<span class="bk-flag">${m.away?.flag||'⚽'}</span>`}
-          <span class="bk-name">${m.away?.name||'TBD'}</span>${awayScore}
-        </div>`
+      ? realTeamRow(m.away, awayWon, awayScore)
       : teamRow(m.away, awayWon ? 'bk-winner' : '');
     const homeRow = !candidates(m.home?.displayName||'')
-      ? `<div class="bk-team${homeWon?' bk-winner':''}">
-          ${m.home?.logo ? `<img class="bk-logo" src="${m.home.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${m.home?.flag||'⚽'}</span>` : `<span class="bk-flag">${m.home?.flag||'⚽'}</span>`}
-          <span class="bk-name">${m.home?.name||'TBD'}</span>${homeScore}
-        </div>`
+      ? realTeamRow(m.home, homeWon, homeScore)
       : teamRow(m.home, homeWon ? 'bk-winner' : '');
     return `<div class="bk-slot${isFinal?' bk-final-slot':''}${isLive?' bk-slot-live':''}" onclick="showMatchDetail('${m.id}')" style="cursor:pointer">
       ${awayRow}
