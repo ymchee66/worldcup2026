@@ -1475,7 +1475,7 @@ function renderBracket() {
         ? `<span class="bk-cand-sub">${c.posLabel} Grp ${c.groupLetter}</span>` : '';
       return `<div class="bk-cand ${cls}">
         <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
-        <span class="bk-cand-name">${c.name}${subtitle}</span>${probStr}${badge}
+        <div class="bk-cand-info"><span class="bk-cand-name">${c.name}</span>${subtitle}</div>${probStr}${badge}
       </div>`;
     }).join('');
     return `<div class="bk-team bk-cands">
@@ -1520,7 +1520,7 @@ function renderBracket() {
       }
       return `<div class="bk-team bk-cands">
         <div class="bk-cand bk-cand-sure${won?' bk-winner':''}">
-          ${logo}<span class="bk-cand-name">${team?.name||'TBD'}${subtitle}</span>${score}<span class="bk-tick">✓</span>
+          ${logo}<div class="bk-cand-info"><span class="bk-cand-name">${team?.name||'TBD'}</span>${subtitle}</div>${score}<span class="bk-tick">✓</span>
         </div>
       </div>`;
     };
