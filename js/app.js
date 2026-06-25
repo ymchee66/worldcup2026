@@ -1286,14 +1286,16 @@ function renderBracket() {
 
     const groupDone = entries.every(e => e.gp === 3);
 
+    const posLabel = targetPos === 1 ? '1st' : '2nd';
+
     if (groupDone) {
       const rawHolder = entries[targetPos - 1];
       if (!rawHolder) return [];
       if (!committedTeams.has(rawHolder.name)) {
-        return [{ ...rawHolder, confirmed: true, leader: false }];
+        return [{ ...rawHolder, confirmed: true, leader: false, groupLetter, posLabel }];
       }
       const next = entries.slice(targetPos).find(e => !committedTeams.has(e.name));
-      return next ? [{ ...next, confirmed: true, leader: false }] : [];
+      return next ? [{ ...next, confirmed: true, leader: false, groupLetter, posLabel }] : [];
     }
 
     const rawAtPos = entries[targetPos - 1];
@@ -1302,7 +1304,7 @@ function renderBracket() {
 
     const result = eligible
       .filter(e => (e.pts + (3 - e.gp) * 3) >= threshold)
-      .map(e => ({ ...e, confirmed: false, leader: false, prob: groupProbs[groupLetter]?.[e.name]?.[targetPos - 1] ?? null }))
+      .map(e => ({ ...e, confirmed: false, leader: false, prob: groupProbs[groupLetter]?.[e.name]?.[targetPos - 1] ?? null, groupLetter, posLabel }))
       .filter(e => e.prob === null || e.prob > 0);
 
     // Sort by predicted proximity to targetPos: team predicted closest to this
@@ -1339,7 +1341,7 @@ function renderBracket() {
         // 3rd-place teams advance, and we don't know yet which groups qualify.
         // Show as a 100%-prob candidate (leader) but without the confirmed ✓ badge.
         if (current3rd && !committedTeams.has(current3rd.name)) {
-          thirds.push({ ...current3rd, groupLetter: l, confirmed: false, possible: false, prob: 1 });
+          thirds.push({ ...current3rd, groupLetter: l, posLabel: '3rd', confirmed: false, possible: false, prob: 1 });
         }
       } else {
         for (let i = 0; i < grp.length; i++) { // all positions
@@ -1369,7 +1371,7 @@ function renderBracket() {
             : !!(grp[1] && teamMax >= grp[1].pts);
           const p3 = groupProbs[l]?.[team.name]?.[2] ?? null;
           if (p3 !== null && p3 === 0) continue;
-          thirds.push({ ...team, groupLetter: l, confirmed: false, possible: couldReach2nd, prob: p3 });
+          thirds.push({ ...team, groupLetter: l, posLabel: '3rd', confirmed: false, possible: couldReach2nd, prob: p3 });
         }
       }
     }
@@ -1463,13 +1465,17 @@ function renderBracket() {
       return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.displayName||team.name}</span></div>`;
     }
     const rows = cands.map(c => {
-      const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
-      const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
-      const probPct = (!c.confirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
+      const isLeader100 = c.leader && c.prob != null && Math.round(c.prob * 100) === 100;
+      const sure = c.confirmed || isLeader100;
+      const cls = sure ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
+      const badge = sure ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
+      const probPct = (!sure && c.prob != null) ? Math.round(c.prob * 100) : null;
       const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
+      const subtitle = (sure || c.leader) && c.groupLetter && c.posLabel
+        ? `<span class="bk-cand-sub">${c.posLabel} Grp ${c.groupLetter}</span>` : '';
       return `<div class="bk-cand ${cls}">
         <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
-        <span class="bk-cand-name">${c.name}</span>${probStr}${badge}
+        <span class="bk-cand-name">${c.name}${subtitle}</span>${probStr}${badge}
       </div>`;
     }).join('');
     return `<div class="bk-team bk-cands">
@@ -1502,9 +1508,19 @@ function renderBracket() {
       const logo = team?.logo
         ? `<img class="bk-logo" src="${team.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${team?.flag||'⚽'}</span>`
         : `<span class="bk-flag">${team?.flag||'⚽'}</span>`;
+      // Find group position for subtitle
+      let subtitle = '';
+      for (const [letter, entries] of Object.entries(byGroup)) {
+        const idx = entries.findIndex(e => e.name === team?.name);
+        if (idx !== -1) {
+          const pos = idx === 0 ? '1st' : idx === 1 ? '2nd' : '3rd';
+          subtitle = `<span class="bk-cand-sub">${pos} Grp ${letter}</span>`;
+          break;
+        }
+      }
       return `<div class="bk-team bk-cands">
         <div class="bk-cand bk-cand-sure${won?' bk-winner':''}">
-          ${logo}<span class="bk-cand-name">${team?.name||'TBD'}</span>${score}<span class="bk-tick">✓</span>
+          ${logo}<span class="bk-cand-name">${team?.name||'TBD'}${subtitle}</span>${score}<span class="bk-tick">✓</span>
         </div>
       </div>`;
     };
