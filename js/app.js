@@ -1450,8 +1450,10 @@ function renderBracket() {
       const logo = team?.logo
         ? `<img class="bk-logo" src="${team.logo}" alt="${team.name||''}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${team?.flag||'⚽'}</span>`
         : `<span class="bk-flag">${team?.flag||'⚽'}</span>`;
-      return `<div class="bk-team${winnerClass ? ' '+winnerClass : ''}">
-        ${logo}<span class="bk-name">${team?.name||'TBD'}</span>
+      return `<div class="bk-team bk-cands">
+        <div class="bk-cand bk-cand-sure">
+          ${logo}<span class="bk-cand-name">${team?.name||'TBD'}</span><span class="bk-tick">✓</span>
+        </div>
       </div>`;
     }
     // Placeholder: show candidates
@@ -1459,9 +1461,10 @@ function renderBracket() {
       return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.displayName||team.name}</span></div>`;
     }
     const rows = cands.map(c => {
-      const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
-      const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
-      const probPct = (!c.confirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
+      const effectivelyConfirmed = c.confirmed || (c.prob != null && Math.round(c.prob * 100) === 100);
+      const cls = effectivelyConfirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
+      const badge = effectivelyConfirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
+      const probPct = (!effectivelyConfirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
       const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
       return `<div class="bk-cand ${cls}">
         <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
