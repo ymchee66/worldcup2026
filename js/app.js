@@ -1465,11 +1465,9 @@ function renderBracket() {
       return `<div class="bk-team bk-cands"><span class="bk-cand-lbl">${team.displayName||team.name}</span></div>`;
     }
     const rows = cands.map(c => {
-      const isLeader100 = c.leader && c.prob != null && Math.round(c.prob * 100) === 100;
-      const sure = c.confirmed || isLeader100;
-      const cls = sure ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
-      const badge = sure ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
-      const probPct = (!sure && c.prob != null) ? Math.round(c.prob * 100) : null;
+      const cls = c.confirmed ? 'bk-cand-sure' : (c.leader ? 'bk-cand-lead' : 'bk-cand-maybe');
+      const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
+      const probPct = (!c.confirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
       const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
       const subtitle = (sure || c.leader) && c.groupLetter && c.posLabel
         ? `<span class="bk-cand-sub">${c.posLabel} Grp ${c.groupLetter}</span>` : '';
