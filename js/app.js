@@ -1518,7 +1518,7 @@ function renderBracket() {
       const badge = c.confirmed ? '<span class="bk-tick">✓</span>' : (c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '');
       const probPct = (!c.confirmed && c.prob != null) ? Math.round(c.prob * 100) : null;
       const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
-      const subtitle = (c.confirmed || c.leader) && c.groupLetter && c.posLabel
+      const subtitle = c.confirmed && c.groupLetter && c.posLabel
         ? `<span class="bk-cand-sub">${c.posLabel} Grp ${c.groupLetter}</span>` : '';
       return `<div class="bk-cand ${cls}">
         <span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>
