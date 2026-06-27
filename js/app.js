@@ -8,8 +8,10 @@ const state = {
   activeSection: 'scores', selectedMatch: null, newsExpanded: new Set(),
   teamIdMap: {}, // abbr → ESPN team ID
   predictionCache: {}, // eventId → prediction text
-  matchOdds: {},   // eventId → {home, draw, away} probabilities (0-100)
-  groupProbs: {},  // letter → { teamName: [p1st, p2nd, p3rd, p4th] }
+  matchOdds: {},       // eventId → {home, draw, away} probabilities (0-100)
+  groupProbs: {},      // letter → { teamName: [p1st, p2nd, p3rd, p4th] }
+  thirdDist: {},       // letter → [{teamName, pts, gd, gf, prob}] 3rd-place outcome distribution
+  thirdQualProbs: {},  // letter → { teamName: prob } cross-group qualifying probability
 };
 
 // ── Historical data ───────────────────────────────────────────────────────
@@ -1120,7 +1122,7 @@ function recomputeGroupProbs() {
 
   function computeOne(letter) {
     const entries = byGroup[letter] || [];
-    if (!entries.length) return {};
+    if (!entries.length) return { probs: {}, thirdDist: [] };
     const unplayed = state.schedule.filter(m =>
       m.status === 'pre' &&
       m.round === 'Group Stage' &&
@@ -1129,10 +1131,17 @@ function recomputeGroupProbs() {
       teamToGroup[m.away.name] === letter
     );
     const probs = Object.fromEntries(entries.map(e => [e.name, [0, 0, 0, 0]]));
+    const thirdMap = {}; // "name|pts|gd|gf" → {teamName, pts, gd, gf, prob}
     function enumerate(idx, snap, weight) {
       if (idx === unplayed.length) {
         const sorted = [...snap].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
         sorted.forEach((e, i) => { if (probs[e.name]) probs[e.name][i] += weight; });
+        if (sorted.length >= 3) {
+          const t = sorted[2];
+          const key = `${t.name}|${t.pts}|${t.gd}|${t.gf}`;
+          if (!thirdMap[key]) thirdMap[key] = { teamName: t.name, pts: t.pts, gd: t.gd, gf: t.gf, prob: 0 };
+          thirdMap[key].prob += weight;
+        }
         return;
       }
       const match = unplayed[idx];
@@ -1155,12 +1164,62 @@ function recomputeGroupProbs() {
       }
     }
     enumerate(0, entries.map(e => ({ gf: 0, ga: 0, gd: 0, ...e })), 1);
-    return probs;
+    return { probs, thirdDist: Object.values(thirdMap) };
   }
 
-  const result = {};
-  for (const letter of Object.keys(byGroup)) result[letter] = computeOne(letter);
-  state.groupProbs = result;
+  const groupProbs = {};
+  const thirdDistAll = {};
+  for (const letter of Object.keys(byGroup)) {
+    const { probs, thirdDist } = computeOne(letter);
+    groupProbs[letter] = probs;
+    thirdDistAll[letter] = thirdDist;
+  }
+  state.groupProbs = groupProbs;
+  state.thirdDist  = thirdDistAll;
+
+  // Cross-group 3rd-place qualifying probability.
+  // WC2026: 12 groups, top 8 3rd-place teams advance.
+  // P(team T qualifies) = sum over T's possible outcomes of:
+  //   P(T has that outcome) × P(at most 7 other groups' 3rd beats T)
+  // Groups are independent → DP over groups.
+  const beatsP = (a, b) =>
+    a.pts !== b.pts ? (a.pts > b.pts ? 1 : 0) :
+    a.gd  !== b.gd  ? (a.gd  > b.gd  ? 1 : 0) :
+    a.gf  !== b.gf  ? (a.gf  > b.gf  ? 1 : 0) : 0.5;
+
+  const letters = Object.keys(thirdDistAll);
+  const thirdQualProbs = {};
+  for (const targetLetter of letters) {
+    thirdQualProbs[targetLetter] = {};
+    const targetDist = thirdDistAll[targetLetter] || [];
+    const otherDists = letters.filter(l => l !== targetLetter).map(l => thirdDistAll[l] || []);
+    const teamNames  = [...new Set(targetDist.map(o => o.teamName))];
+    for (const teamName of teamNames) {
+      const teamOutcomes = targetDist.filter(o => o.teamName === teamName);
+      let totalQual = 0;
+      for (const tOut of teamOutcomes) {
+        // P(each other group's 3rd beats tOut)
+        const beatProbs = otherDists.map(dist =>
+          dist.reduce((s, o) => s + o.prob * beatsP(o, tOut), 0)
+        );
+        // DP: P(at most 7 of the other groups beat tOut)
+        let dp = [1];
+        for (const p of beatProbs) {
+          const nd = new Array(dp.length + 1).fill(0);
+          for (let j = 0; j < dp.length; j++) {
+            nd[j]     += dp[j] * (1 - p);
+            nd[j + 1] += dp[j] * p;
+          }
+          dp = nd;
+        }
+        let qual = 0;
+        for (let k = 0; k <= 7 && k < dp.length; k++) qual += dp[k];
+        totalQual += tOut.prob * qual;
+      }
+      thirdQualProbs[targetLetter][teamName] = Math.min(1, Math.max(0, totalQual));
+    }
+  }
+  state.thirdQualProbs = thirdQualProbs;
 }
 
 function renderBracket() {
@@ -1335,44 +1394,33 @@ function renderBracket() {
       const current3rd = grp[2];
 
       if (groupDone) {
-        // Only include in this slot if it's the assigned slot for this group.
         if (confirmedThirdSlot[l] !== slotDn) continue;
-        // Group done but 3rd place is NOT truly "confirmed" for this slot — only 8 best
-        // 3rd-place teams advance, and we don't know yet which groups qualify.
-        // Show as a 100%-prob candidate (leader) but without the confirmed ✓ badge.
         if (current3rd && !committedTeams.has(current3rd.name)) {
-          // prob: null — no % shown, since advancement depends on cross-group ranking
-          thirds.push({ ...current3rd, groupLetter: l, posLabel: '3rd', confirmed: false, possible: false, prob: null });
+          const qualProb = state.thirdQualProbs?.[l]?.[current3rd.name] ?? null;
+          thirds.push({ ...current3rd, groupLetter: l, posLabel: '3rd', confirmed: false, possible: false, prob: qualProb });
         }
       } else {
-        for (let i = 0; i < grp.length; i++) { // all positions
+        for (let i = 0; i < grp.length; i++) {
           const team = grp[i];
           if (!team || committedTeams.has(team.name)) continue;
           const teamMax = team.pts + (3 - team.gp) * 3;
 
           if (i <= 1) {
-            // Currently 1st or 2nd: can fall to 3rd only if enough teams below can overtake.
-            // Need (2-i) teams from below to surpass this team's current pts.
-            // Use strictly > (not >=): a team that can only match this team's pts would
-            // need H2H tiebreakers to rank above, but if they already lost to this team
-            // head-to-head they can't. Strict > is a safe conservative heuristic.
             const needed = 2 - i;
             const canOvertake = grp.slice(i + 1).filter(e =>
               !committedTeams.has(e.name) && (e.pts + (3 - e.gp) * 3) > team.pts
             );
             if (canOvertake.length < needed) continue;
           } else if (i === 3) {
-            // Currently 4th: only include if they can reach 3rd's current points.
             if (!current3rd || teamMax < current3rd.pts) continue;
           }
-          // i === 2 (currently 3rd): always a candidate.
 
           const couldReach2nd = current3rd && i < 2
-            ? false // already above 3rd, this flag is for upward movement
+            ? false
             : !!(grp[1] && teamMax >= grp[1].pts);
-          const p3 = groupProbs[l]?.[team.name]?.[2] ?? null;
-          if (p3 !== null && p3 === 0) continue;
-          thirds.push({ ...team, groupLetter: l, posLabel: '3rd', confirmed: false, possible: couldReach2nd, prob: p3 });
+          const qualProb = state.thirdQualProbs?.[l]?.[team.name] ?? null;
+          if (qualProb !== null && qualProb === 0) continue;
+          thirds.push({ ...team, groupLetter: l, posLabel: '3rd', confirmed: false, possible: couldReach2nd, prob: qualProb });
         }
       }
     }
