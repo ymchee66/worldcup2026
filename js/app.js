@@ -1341,7 +1341,8 @@ function renderBracket() {
         // 3rd-place teams advance, and we don't know yet which groups qualify.
         // Show as a 100%-prob candidate (leader) but without the confirmed ✓ badge.
         if (current3rd && !committedTeams.has(current3rd.name)) {
-          thirds.push({ ...current3rd, groupLetter: l, posLabel: '3rd', confirmed: false, possible: false, prob: 1 });
+          // prob: null — no % shown, since advancement depends on cross-group ranking
+          thirds.push({ ...current3rd, groupLetter: l, posLabel: '3rd', confirmed: false, possible: false, prob: null });
         }
       } else {
         for (let i = 0; i < grp.length; i++) { // all positions
