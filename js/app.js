@@ -1465,31 +1465,37 @@ function renderBracket() {
       candidateCache[dn] = candidates(dn, dn) || [];
     }
   }
-  // Confirmed teams are already limited to one slot (via confirmedThirdSlot).
-  // Still need to deduplicate leader (▶) across non-confirmed candidates.
-  const teamBestSlot = {};
-  for (const [dn, cands] of Object.entries(candidateCache)) {
-    for (const c of cands) {
-      if (!c.leader) continue;
-      const p = c.prob ?? 0;
-      if (!(c.name in teamBestSlot) || p > teamBestSlot[c.name].prob) {
-        teamBestSlot[c.name] = { dn, prob: p };
-      }
-    }
-  }
-  // Demote leader in every non-best slot; confirmed teams become leader in their slot.
-  for (const [dn, cands] of Object.entries(candidateCache)) {
-    for (const c of cands) {
-      if (c.confirmed) { c.leader = true; continue; }
-      if (c.leader && teamBestSlot[c.name]?.dn !== dn) c.leader = false;
-    }
-  }
-  // Second pass: any slot with no leader gets the highest-prob non-highlighted team.
-  const highlightedTeams = new Set(
-    Object.values(candidateCache).flatMap(cs => cs.filter(c => c.leader).map(c => c.name))
-  );
+  // Reset all leader flags (confirmed teams keep theirs via c.confirmed check below).
   for (const cands of Object.values(candidateCache)) {
-    if (cands.some(c => c.leader)) continue;
+    for (const c of cands) { if (!c.confirmed) c.leader = false; }
+  }
+
+  // Greedy maximum-weight assignment: each team highlighted in exactly one slot,
+  // each slot gets at most one highlighted team, maximising probability.
+  // This prevents a team appearing as leader in a low-value slot (e.g. 3rd-place)
+  // while blocking a better-fit for a higher-value slot (e.g. 2nd-place).
+  const allTriplets = [];
+  for (const [dn, cands] of Object.entries(candidateCache)) {
+    for (const c of cands) {
+      if (!c.confirmed && c.prob != null && c.prob > 0)
+        allTriplets.push({ name: c.name, dn, prob: c.prob, c });
+    }
+  }
+  allTriplets.sort((a, b) => b.prob - a.prob);
+
+  const assignedTeams = new Set();
+  const assignedSlots = new Set();
+  for (const { name, dn, c } of allTriplets) {
+    if (assignedTeams.has(name) || assignedSlots.has(dn)) continue;
+    c.leader = true;
+    assignedTeams.add(name);
+    assignedSlots.add(dn);
+  }
+
+  // Any slot still without a leader: pick highest-prob unassigned candidate.
+  const highlightedTeams = new Set(assignedTeams);
+  for (const cands of Object.values(candidateCache)) {
+    if (cands.some(c => c.leader || c.confirmed)) continue;
     const pick = cands.find(c => !highlightedTeams.has(c.name));
     if (pick) { pick.leader = true; highlightedTeams.add(pick.name); }
   }
