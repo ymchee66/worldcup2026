@@ -1665,16 +1665,19 @@ function renderBracket() {
     return `<div class="bk-cand ${cls}">${logo}<div class="bk-cand-info"><span class="bk-cand-name">${c.name}</span></div>${probStr}${badge}</div>`;
   }
 
-  // Render a knockout side (home or away) — real team (match FT/live) or candidate list.
-  // matchDone=true means the match is finished and realTeam is the actual participant.
+  // Render a knockout side (home or away) — real team (match FT) or candidate list.
+  // A dist entry with prob≥0.99 is treated as confirmed and rendered in yellow.
   function knockoutSideRow(dist, realTeam, won, score, matchDone) {
-    if (matchDone && realTeam?.name) {
-      const logo = realTeam.logo
-        ? `<img class="bk-logo" src="${realTeam.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${realTeam.flag||'⚽'}</span>`
-        : `<span class="bk-flag">${realTeam.flag||'⚽'}</span>`;
+    const confirmed = matchDone
+      ? realTeam
+      : (dist.length === 1 && dist[0].prob >= 0.99 ? dist[0] : null);
+    if (confirmed?.name) {
+      const logo = confirmed.logo
+        ? `<img class="bk-logo" src="${confirmed.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${confirmed.flag||'⚽'}</span>`
+        : `<span class="bk-flag">${confirmed.flag||'⚽'}</span>`;
       return `<div class="bk-team bk-cands">
         <div class="bk-cand bk-cand-sure${won?' bk-winner':''}">
-          ${logo}<div class="bk-cand-info"><span class="bk-cand-name">${realTeam.name}</span></div>${score}<span class="bk-tick">✓</span>
+          ${logo}<div class="bk-cand-info"><span class="bk-cand-name">${confirmed.name}</span></div>${score}<span class="bk-tick">✓</span>
         </div>
       </div>`;
     }
@@ -2037,13 +2040,12 @@ async function init() {
     if (state.activeSection === 'stats') renderStats();
     fetchLiveTournamentStats();
 
-    // Fetch pre-match odds for unplayed group stage matches to power predicted standings.
-    // Runs in background; bracket re-renders when odds arrive.
-    const unplayedGroupIds = schedule
-      .filter(m => m.status === 'pre' && m.round === 'Group Stage')
+    // Fetch pre-match odds for all unplayed matches (group stage + knockout).
+    const unplayedIds = schedule
+      .filter(m => m.status === 'pre')
       .map(m => m.id);
-    if (unplayedGroupIds.length) {
-      fetchPredictions(unplayedGroupIds).then(odds => {
+    if (unplayedIds.length) {
+      fetchPredictions(unplayedIds).then(odds => {
         state.matchOdds = odds;
         recomputeGroupProbs();
         if (state.activeSection === 'bracket') renderBracket();
