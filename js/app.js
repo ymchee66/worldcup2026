@@ -1500,6 +1500,198 @@ function renderBracket() {
     if (pick) { pick.leader = true; highlightedTeams.add(pick.name); }
   }
 
+  // ── Knockout propagation ────────────────────────────────────────────────
+  // Declare bracket match arrays here so the propagation code can use them.
+  const r32 = BRACKET_IDS.r32.map(id => getMatch(id));
+  const r16  = BRACKET_IDS.r16.map(id => getMatch(id));
+  const qf   = BRACKET_IDS.qf.map(id => getMatch(id));
+  const sf   = BRACKET_IDS.sf.map(id => getMatch(id));
+  const fin  = getMatch(BRACKET_IDS.final);
+  const trd  = getMatch(BRACKET_IDS.third);
+
+  // For each R32 match compute a winner probability distribution, then propagate
+  // that forward into R16, QF, SF so undecided later-round slots can show candidates.
+
+  // Convert a candidateCache list (may include confirmed=true entries) to a
+  // simple {name, flag, logo, prob} array, normalised so probs sum to ≤1.
+  function candsToDist(cands, realTeam) {
+    if (realTeam?.name && (!cands || !cands.length)) {
+      // Real (confirmed) team on this side
+      return [{ name: realTeam.name, flag: realTeam.flag, logo: realTeam.logo, prob: 1 }];
+    }
+    if (!cands || !cands.length) return [];
+    return cands.map(c => ({ name: c.name, flag: c.flag, logo: c.logo, prob: c.prob ?? 0 }))
+                .filter(d => d.prob > 0);
+  }
+
+  // Given two side-distributions and optional matchOdds, compute who wins.
+  // Uses 50/50 if no odds, or redistributes draw odds proportionally.
+  function winnerDist(homeDist, awayDist, matchId) {
+    const odds = state.matchOdds[matchId];
+    let pH = 0.5, pA = 0.5;
+    if (odds) {
+      const tot = (odds.home ?? 0) + (odds.away ?? 0);
+      if (tot > 0) { pH = odds.home / tot; pA = odds.away / tot; }
+    }
+    const out = {};
+    for (const c of homeDist) {
+      out[c.name] = (out[c.name] ?? { name: c.name, flag: c.flag, logo: c.logo, prob: 0 });
+      out[c.name].prob += c.prob * pH;
+    }
+    for (const c of awayDist) {
+      out[c.name] = (out[c.name] ?? { name: c.name, flag: c.flag, logo: c.logo, prob: 0 });
+      out[c.name].prob += c.prob * pA;
+    }
+    return Object.values(out).filter(d => d.prob > 0.001).sort((a, b) => b.prob - a.prob);
+  }
+
+  // Check if a team object is a real (non-placeholder) team
+  const isReal = team => team?.name && !candidates(team.displayName ?? '');
+
+  // r32SideDist[i] = { home: dist, away: dist } — who could be on each side
+  // r32WinDist[i]  = dist — who wins the R32 match
+  const r32SideDist = [], r32WinDist = [];
+  for (let i = 0; i < r32.length; i++) {
+    const m = r32[i];
+    if (!m) { r32SideDist.push({ home: [], away: [] }); r32WinDist.push([]); continue; }
+    if (m.status === 'post') {
+      const won = m.home?.score > m.away?.score ? m.home : m.away;
+      const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
+      r32SideDist.push({ home: dist, away: dist }); // both sides moot
+      r32WinDist.push(dist);
+      continue;
+    }
+    const hCands = candidateCache[m.home?.displayName ?? ''] ?? [];
+    const aCands = candidateCache[m.away?.displayName ?? ''] ?? [];
+    const hDist = isReal(m.home) ? candsToDist([], m.home) : candsToDist(hCands);
+    const aDist = isReal(m.away) ? candsToDist([], m.away) : candsToDist(aCands);
+    r32SideDist.push({ home: hDist, away: aDist });
+    r32WinDist.push(winnerDist(hDist, aDist, m.id));
+  }
+
+  // r16Feeds: for each R16 index, the two R32 indices that feed into it (top→home, bot→away)
+  const r16Feeds = {};
+  for (const qvObj of Object.values(BRACKET_TREE)) {
+    for (const [r16Key, { top, bot }] of Object.entries(qvObj)) {
+      const idx = parseInt(r16Key.replace('r16_', ''));
+      r16Feeds[idx] = { top, bot };
+    }
+  }
+
+  // r16SideDist[i] = { home: dist, away: dist } — R32 winners feeding this R16 match
+  // r16WinDist[i]  = dist — who wins this R16 match
+  const r16SideDist = [], r16WinDist = [];
+  for (let i = 0; i < r16.length; i++) {
+    const m = r16[i];
+    const feed = r16Feeds[i];
+    if (!feed) { r16SideDist.push({ home: [], away: [] }); r16WinDist.push([]); continue; }
+    const hDist = r32WinDist[feed.top] ?? [];
+    const aDist = r32WinDist[feed.bot] ?? [];
+    if (m?.status === 'post') {
+      const won = m.home?.score > m.away?.score ? m.home : m.away;
+      const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
+      r16SideDist.push({ home: hDist, away: aDist });
+      r16WinDist.push(dist);
+    } else {
+      r16SideDist.push({ home: hDist, away: aDist });
+      r16WinDist.push(winnerDist(hDist, aDist, m?.id));
+    }
+  }
+
+  // QF: determine which R16 matches feed which QF
+  // qf[0]←r16[0,1], qf[1]←r16[4,5], qf[2]←r16[2,3], qf[3]←r16[6,7]
+  const qfFeeds = [
+    { top: 0, bot: 1 }, { top: 4, bot: 5 },
+    { top: 2, bot: 3 }, { top: 6, bot: 7 },
+  ];
+  const qfSideDist = [], qfWinDist = [];
+  for (let i = 0; i < qf.length; i++) {
+    const m = qf[i];
+    const feed = qfFeeds[i];
+    const hDist = r16WinDist[feed.top] ?? [];
+    const aDist = r16WinDist[feed.bot] ?? [];
+    if (m?.status === 'post') {
+      const won = m.home?.score > m.away?.score ? m.home : m.away;
+      const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
+      qfSideDist.push({ home: hDist, away: aDist });
+      qfWinDist.push(dist);
+    } else {
+      qfSideDist.push({ home: hDist, away: aDist });
+      qfWinDist.push(winnerDist(hDist, aDist, m?.id));
+    }
+  }
+
+  // SF: qf[0,1] → sf[0], qf[2,3] → sf[1]
+  const sfFeeds = [{ top: 0, bot: 1 }, { top: 2, bot: 3 }];
+  const sfSideDist = [], sfWinDist = [];
+  for (let i = 0; i < sf.length; i++) {
+    const m = sf[i];
+    const feed = sfFeeds[i];
+    const hDist = qfWinDist[feed.top] ?? [];
+    const aDist = qfWinDist[feed.bot] ?? [];
+    if (m?.status === 'post') {
+      const won = m.home?.score > m.away?.score ? m.home : m.away;
+      const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
+      sfSideDist.push({ home: hDist, away: aDist });
+      sfWinDist.push(dist);
+    } else {
+      sfSideDist.push({ home: hDist, away: aDist });
+      sfWinDist.push(winnerDist(hDist, aDist, m?.id));
+    }
+  }
+
+  // Final: sf[0] vs sf[1]
+  const finSideDist = { home: sfWinDist[0] ?? [], away: sfWinDist[1] ?? [] };
+
+  // Helper: truncate dist to top N and mark leader
+  function topCandidates(dist, n = 3) {
+    const top = dist.slice(0, n);
+    if (top.length) top[0] = { ...top[0], leader: true };
+    return top;
+  }
+
+  // Render a knockout candidate row
+  function knockoutCandRow(c) {
+    const cls = c.leader ? 'bk-cand-lead' : 'bk-cand-maybe';
+    const badge = c.leader ? '<span class="bk-tick bk-tick-lead">▶</span>' : '';
+    const probPct = c.prob != null ? Math.round(c.prob * 100) : null;
+    const probStr = probPct != null ? `<span class="bk-prob">${probPct}%</span>` : '';
+    const logo = c.logo
+      ? `<img class="bk-logo" src="${c.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${c.flag||'⚽'}</span>`
+      : `<span class="bk-flag" style="font-size:0.8rem">${c.flag||'⚽'}</span>`;
+    return `<div class="bk-cand ${cls}">${logo}<div class="bk-cand-info"><span class="bk-cand-name">${c.name}</span></div>${probStr}${badge}</div>`;
+  }
+
+  // Render a knockout side (home or away) — real team or candidate list
+  function knockoutSideRow(dist, realTeam, won, score) {
+    if (realTeam?.name && isReal(realTeam)) {
+      // Real confirmed team — use the existing realTeamRow via closures not accessible here;
+      // inline it instead
+      const logo = realTeam.logo
+        ? `<img class="bk-logo" src="${realTeam.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${realTeam.flag||'⚽'}</span>`
+        : `<span class="bk-flag">${realTeam.flag||'⚽'}</span>`;
+      let subtitle = '';
+      for (const [letter, entries] of Object.entries(byGroup)) {
+        const idx = entries.findIndex(e => e.name === realTeam.name);
+        if (idx !== -1) {
+          const pos = idx === 0 ? '1st' : idx === 1 ? '2nd' : '3rd';
+          subtitle = `<span class="bk-cand-sub">${pos} Grp ${letter}</span>`;
+          break;
+        }
+      }
+      return `<div class="bk-team bk-cands">
+        <div class="bk-cand bk-cand-sure${won?' bk-winner':''}">
+          ${logo}<div class="bk-cand-info"><span class="bk-cand-name">${realTeam.name}</span>${subtitle}</div>${score}<span class="bk-tick">✓</span>
+        </div>
+      </div>`;
+    }
+    const top = topCandidates(dist);
+    if (!top.length) return `<div class="bk-team"><span class="bk-flag">⚽</span><span class="bk-name">TBD</span></div>`;
+    return `<div class="bk-team bk-cands">${top.map(knockoutCandRow).join('')}</div>`;
+  }
+
+  // ── End knockout propagation ─────────────────────────────────────────────
+
   // Render one team row inside a slot
   function teamRow(team, winnerClass) {
     const cands = team?.displayName
@@ -1590,6 +1782,36 @@ function renderBracket() {
     </div>`;
   }
 
+  // Knockout slot: like slot() but uses propagated candidate distributions for undecided sides
+  function kSlot(m, label, sideDist, isFinal = false) {
+    const { home: hDist = [], away: aDist = [] } = sideDist ?? {};
+    if (!m) {
+      const hRow = knockoutSideRow(aDist, null, false, '');
+      const aRow = knockoutSideRow(hDist, null, false, '');
+      return `<div class="bk-slot bk-tbd${isFinal?' bk-final-slot':''}">
+        ${hRow}
+        <div class="bk-divider">${label||'TBD'}</div>
+        ${aRow}
+      </div>`;
+    }
+    const isLive = m.status === 'in';
+    const isFT   = m.status === 'post';
+    const dateStr = new Date(m.date).toLocaleDateString([], { month:'short', day:'numeric' });
+    const timeStr = new Date(m.date).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    const badge = isLive ? `<span class="bk-live">LIVE ${m.clock||''}</span>` : (isFT ? `<span class="bk-ft">FT</span>` : `<span class="bk-date">${dateStr} ${timeStr}</span>`);
+    const awayWon = isFT && m.away?.score > m.home?.score;
+    const homeWon = isFT && m.home?.score > m.away?.score;
+    const awayScore = (isFT||isLive) ? `<span class="bk-score">${m.away?.score??''}</span>` : '';
+    const homeScore = (isFT||isLive) ? `<span class="bk-score">${m.home?.score??''}</span>` : '';
+    const awayRow = knockoutSideRow(aDist, m.away, awayWon, awayScore);
+    const homeRow = knockoutSideRow(hDist, m.home, homeWon, homeScore);
+    return `<div class="bk-slot${isFinal?' bk-final-slot':''}${isLive?' bk-slot-live':''}" onclick="showMatchDetail('${m.id}')" style="cursor:pointer">
+      ${awayRow}
+      <div class="bk-divider">${badge}</div>
+      ${homeRow}
+    </div>`;
+  }
+
   // Pair two slots with connector lines
   function pair(topSlot, botSlot) {
     return `<div class="bk-pair">${topSlot}${botSlot}</div>`;
@@ -1601,37 +1823,30 @@ function renderBracket() {
   }
 
   // Build left half (top-down: QF0, QF1 → SF1)
-  const r32 = BRACKET_IDS.r32.map(id => getMatch(id));
-  const r16  = BRACKET_IDS.r16.map(id => getMatch(id));
-  const qf   = BRACKET_IDS.qf.map(id => getMatch(id));
-  const sf   = BRACKET_IDS.sf.map(id => getMatch(id));
-  const fin  = getMatch(BRACKET_IDS.final);
-  const trd  = getMatch(BRACKET_IDS.third);
-
   // Left side
-  const L_r16_0 = node(pair(slot(r32[0],'1A/2A'), slot(r32[2],'1C/2C')), slot(r16[0],'R16'));
-  const L_r16_1 = node(pair(slot(r32[1],'1B/2B'), slot(r32[4],'1E/2E')), slot(r16[1],'R16'));
-  const L_qf0   = node(pair(L_r16_0, L_r16_1), slot(qf[0],'QF'));
+  const L_r16_0 = node(pair(slot(r32[0],'1A/2A'), slot(r32[2],'1C/2C')), kSlot(r16[0],'R16',r16SideDist[0]));
+  const L_r16_1 = node(pair(slot(r32[1],'1B/2B'), slot(r32[4],'1E/2E')), kSlot(r16[1],'R16',r16SideDist[1]));
+  const L_qf0   = node(pair(L_r16_0, L_r16_1), kSlot(qf[0],'QF',qfSideDist[0]));
 
-  const L_r16_4 = node(pair(slot(r32[8],'1D/3rd'), slot(r32[9],'1L/3rd')), slot(r16[4],'R16'));
-  const L_r16_5 = node(pair(slot(r32[10],'2K/2L'), slot(r32[11],'1H/2J')), slot(r16[5],'R16'));
-  const L_qf1   = node(pair(L_r16_4, L_r16_5), slot(qf[1],'QF'));
+  const L_r16_4 = node(pair(slot(r32[8],'1D/3rd'), slot(r32[9],'1L/3rd')), kSlot(r16[4],'R16',r16SideDist[4]));
+  const L_r16_5 = node(pair(slot(r32[10],'2K/2L'), slot(r32[11],'1H/2J')), kSlot(r16[5],'R16',r16SideDist[5]));
+  const L_qf1   = node(pair(L_r16_4, L_r16_5), kSlot(qf[1],'QF',qfSideDist[1]));
 
-  const L_sf = node(pair(L_qf0, L_qf1), slot(sf[0],'SF'));
+  const L_sf = node(pair(L_qf0, L_qf1), kSlot(sf[0],'SF',sfSideDist[0]));
 
   // Right side (mirrored)
-  const R_r16_2 = node(pair(slot(r32[3],'3rd/1E'), slot(r32[5],'MEX/3rd')), slot(r16[2],'R16'));
-  const R_r16_3 = node(pair(slot(r32[6],'3rd/1I'), slot(r32[7],'1G/3rd')), slot(r16[3],'R16'));
-  const R_qf2   = node(pair(R_r16_2, R_r16_3), slot(qf[2],'QF'));
+  const R_r16_2 = node(pair(slot(r32[3],'3rd/1E'), slot(r32[5],'MEX/3rd')), kSlot(r16[2],'R16',r16SideDist[2]));
+  const R_r16_3 = node(pair(slot(r32[6],'3rd/1I'), slot(r32[7],'1G/3rd')), kSlot(r16[3],'R16',r16SideDist[3]));
+  const R_qf2   = node(pair(R_r16_2, R_r16_3), kSlot(qf[2],'QF',qfSideDist[2]));
 
-  const R_r16_6 = node(pair(slot(r32[12],'1B/3rd'), slot(r32[14],'1J/2H')), slot(r16[6],'R16'));
-  const R_r16_7 = node(pair(slot(r32[13],'2D/2G'), slot(r32[15],'1K/3rd')), slot(r16[7],'R16'));
-  const R_qf3   = node(pair(R_r16_6, R_r16_7), slot(qf[3],'QF'));
+  const R_r16_6 = node(pair(slot(r32[12],'1B/3rd'), slot(r32[14],'1J/2H')), kSlot(r16[6],'R16',r16SideDist[6]));
+  const R_r16_7 = node(pair(slot(r32[13],'2D/2G'), slot(r32[15],'1K/3rd')), kSlot(r16[7],'R16',r16SideDist[7]));
+  const R_qf3   = node(pair(R_r16_6, R_r16_7), kSlot(qf[3],'QF',qfSideDist[3]));
 
-  const R_sf = node(pair(R_qf2, R_qf3), slot(sf[1],'SF'));
+  const R_sf = node(pair(R_qf2, R_qf3), kSlot(sf[1],'SF',sfSideDist[1]));
 
   // Final
-  const finalNode = node(pair(L_sf, R_sf), slot(fin,'Final',true));
+  const finalNode = node(pair(L_sf, R_sf), kSlot(fin,'Final',finSideDist,true));
 
   el.innerHTML = `
     <div class="bk-legend">
