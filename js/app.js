@@ -1569,37 +1569,40 @@ function renderBracket() {
     r32WinDist.push(winnerDist(hDist, aDist, m.id));
   }
 
-  // r16Feeds: for each R16 index, the two R32 indices that feed into it (top→home, bot→away)
+  // r16Feeds: BRACKET_TREE is 3-level deep (sf→qf→r16), so traverse all three levels.
+  // top = R32 index whose winner appears visually on top; bot = appears on bottom.
+  // In kSlot we render: away (visual top) = r32Win[top], home (visual bottom) = r32Win[bot].
   const r16Feeds = {};
-  for (const qvObj of Object.values(BRACKET_TREE)) {
-    for (const [r16Key, { top, bot }] of Object.entries(qvObj)) {
-      const idx = parseInt(r16Key.replace('r16_', ''));
-      r16Feeds[idx] = { top, bot };
+  for (const sfObj of Object.values(BRACKET_TREE)) {
+    for (const qfObj of Object.values(sfObj)) {
+      for (const [r16Key, { top, bot }] of Object.entries(qfObj)) {
+        const idx = parseInt(r16Key.replace('r16_', ''));
+        r16Feeds[idx] = { top, bot };
+      }
     }
   }
 
-  // r16SideDist[i] = { home: dist, away: dist } — R32 winners feeding this R16 match
-  // r16WinDist[i]  = dist — who wins this R16 match
+  // r16SideDist[i] — who feeds each side of the R16 match.
+  // away = winner of top R32 (visual top), home = winner of bot R32 (visual bottom).
   const r16SideDist = [], r16WinDist = [];
   for (let i = 0; i < r16.length; i++) {
     const m = r16[i];
     const feed = r16Feeds[i];
     if (!feed) { r16SideDist.push({ home: [], away: [] }); r16WinDist.push([]); continue; }
-    const hDist = r32WinDist[feed.top] ?? [];
-    const aDist = r32WinDist[feed.bot] ?? [];
+    const awayDist = r32WinDist[feed.top] ?? [];  // visual top → away slot
+    const homeDist = r32WinDist[feed.bot] ?? [];  // visual bottom → home slot
     if (m?.status === 'post') {
       const won = m.home?.score > m.away?.score ? m.home : m.away;
       const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
-      r16SideDist.push({ home: hDist, away: aDist });
+      r16SideDist.push({ home: homeDist, away: awayDist });
       r16WinDist.push(dist);
     } else {
-      r16SideDist.push({ home: hDist, away: aDist });
-      r16WinDist.push(winnerDist(hDist, aDist, m?.id));
+      r16SideDist.push({ home: homeDist, away: awayDist });
+      r16WinDist.push(winnerDist(homeDist, awayDist, m?.id));
     }
   }
 
-  // QF: determine which R16 matches feed which QF
-  // qf[0]←r16[0,1], qf[1]←r16[4,5], qf[2]←r16[2,3], qf[3]←r16[6,7]
+  // QF: qf[0]←r16[0,1], qf[1]←r16[4,5], qf[2]←r16[2,3], qf[3]←r16[6,7]
   const qfFeeds = [
     { top: 0, bot: 1 }, { top: 4, bot: 5 },
     { top: 2, bot: 3 }, { top: 6, bot: 7 },
@@ -1608,16 +1611,16 @@ function renderBracket() {
   for (let i = 0; i < qf.length; i++) {
     const m = qf[i];
     const feed = qfFeeds[i];
-    const hDist = r16WinDist[feed.top] ?? [];
-    const aDist = r16WinDist[feed.bot] ?? [];
+    const awayDist = r16WinDist[feed.top] ?? [];
+    const homeDist = r16WinDist[feed.bot] ?? [];
     if (m?.status === 'post') {
       const won = m.home?.score > m.away?.score ? m.home : m.away;
       const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
-      qfSideDist.push({ home: hDist, away: aDist });
+      qfSideDist.push({ home: homeDist, away: awayDist });
       qfWinDist.push(dist);
     } else {
-      qfSideDist.push({ home: hDist, away: aDist });
-      qfWinDist.push(winnerDist(hDist, aDist, m?.id));
+      qfSideDist.push({ home: homeDist, away: awayDist });
+      qfWinDist.push(winnerDist(homeDist, awayDist, m?.id));
     }
   }
 
@@ -1627,21 +1630,21 @@ function renderBracket() {
   for (let i = 0; i < sf.length; i++) {
     const m = sf[i];
     const feed = sfFeeds[i];
-    const hDist = qfWinDist[feed.top] ?? [];
-    const aDist = qfWinDist[feed.bot] ?? [];
+    const awayDist = qfWinDist[feed.top] ?? [];
+    const homeDist = qfWinDist[feed.bot] ?? [];
     if (m?.status === 'post') {
       const won = m.home?.score > m.away?.score ? m.home : m.away;
       const dist = won?.name ? [{ name: won.name, flag: won.flag, logo: won.logo, prob: 1 }] : [];
-      sfSideDist.push({ home: hDist, away: aDist });
+      sfSideDist.push({ home: homeDist, away: awayDist });
       sfWinDist.push(dist);
     } else {
-      sfSideDist.push({ home: hDist, away: aDist });
-      sfWinDist.push(winnerDist(hDist, aDist, m?.id));
+      sfSideDist.push({ home: homeDist, away: awayDist });
+      sfWinDist.push(winnerDist(homeDist, awayDist, m?.id));
     }
   }
 
-  // Final: sf[0] vs sf[1]
-  const finSideDist = { home: sfWinDist[0] ?? [], away: sfWinDist[1] ?? [] };
+  // Final: sf[0] top→away, sf[1] bot→home
+  const finSideDist = { home: sfWinDist[1] ?? [], away: sfWinDist[0] ?? [] };
 
   // Helper: truncate dist to top N and mark leader
   function topCandidates(dist, n = 3) {
@@ -1662,26 +1665,16 @@ function renderBracket() {
     return `<div class="bk-cand ${cls}">${logo}<div class="bk-cand-info"><span class="bk-cand-name">${c.name}</span></div>${probStr}${badge}</div>`;
   }
 
-  // Render a knockout side (home or away) — real team or candidate list
-  function knockoutSideRow(dist, realTeam, won, score) {
-    if (realTeam?.name && isReal(realTeam)) {
-      // Real confirmed team — use the existing realTeamRow via closures not accessible here;
-      // inline it instead
+  // Render a knockout side (home or away) — real team (match FT/live) or candidate list.
+  // matchDone=true means the match is finished and realTeam is the actual participant.
+  function knockoutSideRow(dist, realTeam, won, score, matchDone) {
+    if (matchDone && realTeam?.name) {
       const logo = realTeam.logo
         ? `<img class="bk-logo" src="${realTeam.logo}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="bk-flag" style="display:none">${realTeam.flag||'⚽'}</span>`
         : `<span class="bk-flag">${realTeam.flag||'⚽'}</span>`;
-      let subtitle = '';
-      for (const [letter, entries] of Object.entries(byGroup)) {
-        const idx = entries.findIndex(e => e.name === realTeam.name);
-        if (idx !== -1) {
-          const pos = idx === 0 ? '1st' : idx === 1 ? '2nd' : '3rd';
-          subtitle = `<span class="bk-cand-sub">${pos} Grp ${letter}</span>`;
-          break;
-        }
-      }
       return `<div class="bk-team bk-cands">
         <div class="bk-cand bk-cand-sure${won?' bk-winner':''}">
-          ${logo}<div class="bk-cand-info"><span class="bk-cand-name">${realTeam.name}</span>${subtitle}</div>${score}<span class="bk-tick">✓</span>
+          ${logo}<div class="bk-cand-info"><span class="bk-cand-name">${realTeam.name}</span></div>${score}<span class="bk-tick">✓</span>
         </div>
       </div>`;
     }
@@ -1786,12 +1779,13 @@ function renderBracket() {
   function kSlot(m, label, sideDist, isFinal = false) {
     const { home: hDist = [], away: aDist = [] } = sideDist ?? {};
     if (!m) {
-      const hRow = knockoutSideRow(aDist, null, false, '');
-      const aRow = knockoutSideRow(hDist, null, false, '');
+      // No match data yet — show candidate dists; away=visual-top, home=visual-bottom
+      const awayRow = knockoutSideRow(aDist, null, false, '', false);
+      const homeRow = knockoutSideRow(hDist, null, false, '', false);
       return `<div class="bk-slot bk-tbd${isFinal?' bk-final-slot':''}">
-        ${hRow}
+        ${awayRow}
         <div class="bk-divider">${label||'TBD'}</div>
-        ${aRow}
+        ${homeRow}
       </div>`;
     }
     const isLive = m.status === 'in';
@@ -1803,8 +1797,9 @@ function renderBracket() {
     const homeWon = isFT && m.home?.score > m.away?.score;
     const awayScore = (isFT||isLive) ? `<span class="bk-score">${m.away?.score??''}</span>` : '';
     const homeScore = (isFT||isLive) ? `<span class="bk-score">${m.home?.score??''}</span>` : '';
-    const awayRow = knockoutSideRow(aDist, m.away, awayWon, awayScore);
-    const homeRow = knockoutSideRow(hDist, m.home, homeWon, homeScore);
+    // Only show real team data when match is decided; otherwise show predicted dist
+    const awayRow = knockoutSideRow(aDist, m.away, awayWon, awayScore, isFT);
+    const homeRow = knockoutSideRow(hDist, m.home, homeWon, homeScore, isFT);
     return `<div class="bk-slot${isFinal?' bk-final-slot':''}${isLive?' bk-slot-live':''}" onclick="showMatchDetail('${m.id}')" style="cursor:pointer">
       ${awayRow}
       <div class="bk-divider">${badge}</div>
